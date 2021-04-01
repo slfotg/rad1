@@ -1,49 +1,131 @@
 use super::ChessAgent;
-use shakmaty::{Chess, Color, Position, Role, Setup};
+use shakmaty::{Chess, Color, Position, Role, Setup, Square};
+use std::cmp;
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 pub struct NaiveChessAgent {
     pub color: Color,
     pub depth: usize,
 }
 
-fn max(a: f64, b: f64) -> f64 {
-    if a > b {
-        a
-    } else {
-        b
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct Value {
+    piece_value: i32,
+    position_value: i32,
+}
+
+impl Value {
+    const MAX: Value = Value {
+        piece_value: i32::MAX,
+        position_value: i32::MAX,
+    };
+    const MIN: Value = Value {
+        piece_value: i32::MIN,
+        position_value: i32::MIN,
+    };
+    const ZERO: Value = Value {
+        piece_value: 0,
+        position_value: 0,
+    };
+}
+
+impl Add for Value {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        Self {
+            piece_value: self.piece_value + other.piece_value,
+            position_value: self.position_value + other.position_value,
+        }
     }
 }
 
-fn min(a: f64, b: f64) -> f64 {
-    if a < b {
-        a
-    } else {
-        b
+impl AddAssign for Value {
+    fn add_assign(&mut self, other: Self) {
+        *self = *self + other;
     }
 }
 
-fn heuristic(game: &Chess) -> f64 {
+impl Sub for Value {
+    type Output = Self;
+    fn sub(self, other: Self) -> Self {
+        Self {
+            piece_value: self.piece_value - other.piece_value,
+            position_value: self.position_value - other.position_value,
+        }
+    }
+}
+
+impl SubAssign for Value {
+    fn sub_assign(&mut self, other: Self) {
+        *self = *self - other;
+    }
+}
+
+fn heuristic(game: &Chess) -> Value {
     if game.is_game_over() {
         match game.outcome().unwrap().winner() {
-            Option::None => 0.0,
-            Option::Some(Color::White) => f64::MAX,
-            Option::Some(Color::Black) => f64::MIN,
+            Option::None => Value::ZERO,
+            Option::Some(Color::White) => Value::MAX,
+            Option::Some(Color::Black) => Value::MIN,
         }
     } else {
-        let mut value = 0.0;
-        for (_, piece) in game.board().pieces() {
+        let mut value = Value::ZERO;
+        for (square, piece) in game.board().pieces() {
             let piece_value = match piece.role {
-                Role::Pawn => 1.0,
-                Role::Knight => 3.0,
-                Role::Bishop => 3.0,
-                Role::Rook => 5.0,
-                Role::Queen => 9.0,
-                Role::King => 0.0,
+                Role::Pawn => 1,
+                Role::Knight => 3,
+                Role::Bishop => 3,
+                Role::Rook => 5,
+                Role::Queen => 9,
+                Role::King => 0,
+            };
+            let position_value = match square {
+                Square::D5 => 4,
+                Square::E5 => 4,
+                Square::D4 => 4,
+                Square::E4 => 4,
+                Square::C6 => 3,
+                Square::D6 => 3,
+                Square::E6 => 3,
+                Square::F6 => 3,
+                Square::C5 => 3,
+                Square::F5 => 3,
+                Square::C4 => 3,
+                Square::F4 => 3,
+                Square::C3 => 3,
+                Square::D3 => 3,
+                Square::E3 => 3,
+                Square::F3 => 3,
+                Square::B7 => 2,
+                Square::C7 => 2,
+                Square::D7 => 2,
+                Square::E7 => 2,
+                Square::F7 => 2,
+                Square::G7 => 2,
+                Square::B6 => 2,
+                Square::B5 => 2,
+                Square::B4 => 2,
+                Square::B3 => 2,
+                Square::G6 => 2,
+                Square::G5 => 2,
+                Square::G4 => 2,
+                Square::G3 => 2,
+                Square::B2 => 2,
+                Square::C2 => 2,
+                Square::D2 => 2,
+                Square::E2 => 2,
+                Square::F2 => 2,
+                Square::G2 => 2,
+                _ => 1,
+            };
+            let partial_value = Value {
+                piece_value,
+                position_value,
             };
             if piece.color == Color::White {
-                value += piece_value;
+                value += partial_value;
             } else {
-                value -= piece_value;
+                value -= partial_value;
             }
         }
         value
@@ -61,16 +143,16 @@ fn children(game: Chess) -> Vec<Chess> {
         .collect()
 }
 
-fn max_alpha_beta(game: Chess, depth: usize, mut alpha: f64, beta: f64) -> f64 {
+fn max_alpha_beta(game: Chess, depth: usize, mut alpha: Value, beta: Value) -> Value {
     if depth == 0 || game.is_game_over() {
         heuristic(&game)
     } else {
-        let mut value = f64::MIN;
-        let children = children(game);
-
+        let mut value = Value::MIN;
+        let mut children = children(game);
+        children.sort_by(|a, b| heuristic(&b).partial_cmp(&heuristic(&a)).unwrap());
         for child in children.iter() {
-            value = max(value, min_alpha_beta(child.clone(), depth - 1, alpha, beta));
-            alpha = max(alpha, value);
+            value = cmp::max(value, min_alpha_beta(child.clone(), depth - 1, alpha, beta));
+            alpha = cmp::max(alpha, value);
             if alpha >= beta {
                 break;
             }
@@ -79,16 +161,16 @@ fn max_alpha_beta(game: Chess, depth: usize, mut alpha: f64, beta: f64) -> f64 {
     }
 }
 
-fn min_alpha_beta(game: Chess, depth: usize, alpha: f64, mut beta: f64) -> f64 {
+fn min_alpha_beta(game: Chess, depth: usize, alpha: Value, mut beta: Value) -> Value {
     if depth == 0 || game.is_game_over() {
         heuristic(&game)
     } else {
-        let mut value = f64::MAX;
-        let children = children(game);
-
+        let mut value = Value::MAX;
+        let mut children = children(game);
+        children.sort_by(|a, b| heuristic(&a).partial_cmp(&heuristic(&b)).unwrap());
         for child in children.iter() {
-            value = min(value, max_alpha_beta(child.clone(), depth - 1, alpha, beta));
-            beta = min(beta, value);
+            value = cmp::min(value, max_alpha_beta(child.clone(), depth - 1, alpha, beta));
+            beta = cmp::min(beta, value);
             if beta <= alpha {
                 break;
             }
@@ -102,11 +184,11 @@ impl ChessAgent for NaiveChessAgent {
         super::check_side_to_move(&self.color, &position);
         let moves = position.legal_moves();
         let mut value;
-        let mut alpha = f64::MIN;
-        let mut beta = f64::MAX;
+        let mut alpha = Value::MIN;
+        let mut beta = Value::MAX;
         let mut selected_move = moves[0].clone();
         if Color::White == position.turn() {
-            value = f64::MIN;
+            value = Value::MIN;
             for chess_move in moves.iter() {
                 let mut child = position.clone();
                 child.play_unchecked(chess_move);
@@ -116,10 +198,10 @@ impl ChessAgent for NaiveChessAgent {
                     value = child_value;
                     selected_move = chess_move.clone();
                 }
-                alpha = max(alpha, value);
+                alpha = cmp::max(alpha, value);
             }
         } else {
-            value = f64::MAX;
+            value = Value::MAX;
             for chess_move in moves.iter() {
                 let mut child = position.clone();
                 child.play_unchecked(chess_move);
@@ -128,7 +210,7 @@ impl ChessAgent for NaiveChessAgent {
                     value = child_value;
                     selected_move = chess_move.clone();
                 }
-                beta = min(beta, value);
+                beta = cmp::min(beta, value);
                 if beta <= alpha {
                     break;
                 }

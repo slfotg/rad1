@@ -5,7 +5,7 @@ use shakmaty::*;
 fn main() {
     let mut chess_game = Chess::default();
     let mut player1 = agent::command_line_agent(Color::White);
-    let mut player2 = agent::random_chess_agent(Color::Black);
+    let mut player2 = agent::naive_chess_agent(Color::Black, 6);
     let mut current_player = Color::White;
     print_game(&chess_game);
     while !chess_game.is_game_over() {

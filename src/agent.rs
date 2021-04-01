@@ -1,6 +1,7 @@
 use rand;
 use shakmaty::{Chess, Color, Position};
 
+mod naive;
 mod random;
 mod uci;
 
@@ -17,6 +18,10 @@ pub fn random_chess_agent(color: Color) -> impl ChessAgent {
 
 pub fn command_line_agent(color: Color) -> impl ChessAgent {
     uci::UciAgent { color }
+}
+
+pub fn naive_chess_agent(color: Color, depth: usize) -> impl ChessAgent {
+    naive::NaiveChessAgent { color, depth }
 }
 
 fn check_side_to_move(color: &Color, position: &impl Position) {

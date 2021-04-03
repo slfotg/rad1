@@ -112,4 +112,182 @@ impl ChessHasher {
         hash ^= self.get_castling_hash(game.castling_rights());
         hash ^ self.get_en_passant_hash(game.ep_square())
     }
+
+    pub fn update_hash(
+        &self,
+        original_hash: i64,
+        original_game: &Chess,
+        new_game: &Chess,
+        chess_move: &Move,
+    ) -> i64 {
+        let mut new_hash = original_hash;
+        let color = original_game.turn();
+        let opp_color = new_game.turn();
+        // update color
+        new_hash ^= self.random_numbers[768];
+        // update castling rights
+        new_hash ^= self.get_castling_hash(original_game.castling_rights());
+        new_hash ^= self.get_castling_hash(new_game.castling_rights());
+        // update en passant
+        new_hash ^= self.get_en_passant_hash(original_game.ep_square());
+        new_hash ^= self.get_en_passant_hash(new_game.ep_square());
+        // update piece positions
+        match *chess_move {
+            Move::Normal {
+                role,
+                from,
+                capture,
+                to,
+                promotion,
+            } => {
+                new_hash ^= self.get_piece_hash(from, Piece { color, role });
+                if let Some(role) = promotion {
+                    new_hash ^= self.get_piece_hash(to, Piece { color, role });
+                } else {
+                    new_hash ^= self.get_piece_hash(to, Piece { color, role });
+                }
+                if let Some(capture) = capture {
+                    new_hash ^= self.get_piece_hash(
+                        to,
+                        Piece {
+                            color: opp_color,
+                            role: capture,
+                        },
+                    );
+                }
+            }
+            Move::EnPassant { from, to } => {
+                new_hash ^= self.get_piece_hash(
+                    from,
+                    Piece {
+                        color,
+                        role: Role::Pawn,
+                    },
+                );
+                new_hash ^= self.get_piece_hash(
+                    to,
+                    Piece {
+                        color,
+                        role: Role::Pawn,
+                    },
+                );
+                new_hash ^= self.get_piece_hash(
+                    Square::from_coords(to.file(), from.rank()),
+                    Piece {
+                        color: opp_color,
+                        role: Role::Pawn,
+                    },
+                );
+            }
+            Move::Castle { king, rook } => {
+                new_hash ^= self.get_piece_hash(
+                    king,
+                    Piece {
+                        color,
+                        role: Role::King,
+                    },
+                );
+                new_hash ^= self.get_piece_hash(
+                    rook,
+                    Piece {
+                        color,
+                        role: Role::Rook,
+                    },
+                );
+                let rank = king.rank();
+                match rook.file() {
+                    File::A => {
+                        new_hash ^= self.get_piece_hash(
+                            Square::from_coords(File::C, rank),
+                            Piece {
+                                color,
+                                role: Role::King,
+                            },
+                        );
+                        new_hash ^= self.get_piece_hash(
+                            Square::from_coords(File::D, rank),
+                            Piece {
+                                color,
+                                role: Role::Rook,
+                            },
+                        );
+                    }
+                    File::H => {
+                        new_hash ^= self.get_piece_hash(
+                            Square::from_coords(File::G, rank),
+                            Piece {
+                                color,
+                                role: Role::King,
+                            },
+                        );
+                        new_hash ^= self.get_piece_hash(
+                            Square::from_coords(File::F, rank),
+                            Piece {
+                                color,
+                                role: Role::Rook,
+                            },
+                        );
+                    }
+                    _ => {
+                        panic!("Illegal castle")
+                    }
+                }
+            }
+            Move::Put { role, to } => {
+                new_hash ^= self.get_piece_hash(to, Piece { color, role });
+            }
+        }
+
+        new_hash
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ChessHasher;
+    use shakmaty::fen::Fen;
+    use shakmaty::uci::Uci;
+    use shakmaty::{CastlingMode, Chess, Position};
+    use test_case::test_case;
+    #[test]
+    fn test_update_hash_from_start() {
+        let position = Chess::default();
+        let hasher = ChessHasher::new();
+        let hash = hasher.hash(&position);
+        for chess_move in position.legal_moves() {
+            let mut next_position = position.clone();
+            next_position.play_unchecked(&chess_move);
+            let expected_hash = hasher.hash(&next_position);
+            let actual_hash = hasher.update_hash(hash, &position, &next_position, &chess_move);
+            println!("{}", expected_hash);
+            assert_eq!(expected_hash, actual_hash);
+        }
+    }
+
+    #[test_case("r1bqkb1r/ppp1pppp/2nP1n2/8/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1", "d6c7"; "capture")]
+    #[test_case("r1bqkbnr/ppp1pppp/2n5/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 1", "e5d6"; "en passant")]
+    #[test_case("r1bqkb1r/ppP2ppp/2n2n2/4p3/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1", "c7d8q"; "capture and promotion")]
+    #[test_case("r3k2r/ppq2pbp/2n2np1/1B2pb2/3P4/1PN2NP1/PBP1QP1P/R3K2R w KQkq - 0 1", "e1g1"; "white king side castle")]
+    #[test_case("r3k2r/ppq2pbp/2n2np1/1B2pb2/3P4/1PN2NP1/PBP1QP1P/R3K2R w KQkq - 0 1", "e1c1"; "white queen side castle")]
+    #[test_case("r3k2r/ppq2pbp/2n2np1/1B2pb2/3P4/1PN2NP1/PBP1QP1P/R3K2R b KQkq - 0 1", "e8g8"; "black king side castle")]
+    #[test_case("r3k2r/ppq2pbp/2n2np1/1B2pb2/3P4/1PN2NP1/PBP1QP1P/R3K2R b KQkq - 0 1", "e8c8"; "black queen side castle")]
+    fn test_update_hash(fen: &str, uci: &str) {
+        let setup: Fen = fen.parse().unwrap();
+
+        let position: Chess = setup.position(CastlingMode::Standard).unwrap();
+
+        let chess_move = Uci::from_ascii(uci.as_bytes())
+            .unwrap()
+            .to_move(&position)
+            .unwrap();
+        let mut next_position = position.clone();
+        next_position.play_unchecked(&chess_move);
+
+        let hasher = ChessHasher::new();
+        let hash = hasher.hash(&position);
+        let expected_hash = hasher.hash(&next_position);
+        let actual_hash = hasher.update_hash(hash, &position, &next_position, &chess_move);
+        println!("{}", expected_hash);
+        assert_eq!(expected_hash, actual_hash);
+    }
 }

@@ -1,5 +1,10 @@
+use lazy_static::lazy_static;
 use shakmaty::*;
 use std::num::Wrapping;
+
+lazy_static! {
+    pub static ref CHESS_HASHER: ChessHasher = ChessHasher::default();
+}
 
 #[derive(Debug, Clone, Copy)]
 struct RandomNumberGenerator {
@@ -44,7 +49,7 @@ pub struct ChessHasher {
 }
 
 impl ChessHasher {
-    pub fn new() -> ChessHasher {
+    pub fn default() -> Self {
         let mut rng = RandomNumberGenerator::new(42);
         let mut random_numbers = [0; 781];
         for i in 0..781 {
@@ -56,7 +61,7 @@ impl ChessHasher {
             Bitboard::from_square(Square::H1),
             Bitboard::from_square(Square::H8),
         ];
-        ChessHasher {
+        Self {
             random_numbers,
             corners,
         }
@@ -244,7 +249,7 @@ impl ChessHasher {
 
 #[cfg(test)]
 mod tests {
-    use super::ChessHasher;
+    use super::CHESS_HASHER;
     use shakmaty::fen::Fen;
     use shakmaty::uci::Uci;
     use shakmaty::{CastlingMode, Chess, Position};
@@ -252,13 +257,13 @@ mod tests {
     #[test]
     fn test_update_hash_from_start() {
         let position = Chess::default();
-        let hasher = ChessHasher::new();
-        let hash = hasher.hash(&position);
+        let hash = CHESS_HASHER.hash(&position);
         for chess_move in position.legal_moves() {
             let mut next_position = position.clone();
             next_position.play_unchecked(&chess_move);
-            let expected_hash = hasher.hash(&next_position);
-            let actual_hash = hasher.update_hash(hash, &position, &next_position, &chess_move);
+            let expected_hash = CHESS_HASHER.hash(&next_position);
+            let actual_hash =
+                CHESS_HASHER.update_hash(hash, &position, &next_position, &chess_move);
             println!("{}", expected_hash);
             assert_eq!(expected_hash, actual_hash);
         }
@@ -283,10 +288,9 @@ mod tests {
         let mut next_position = position.clone();
         next_position.play_unchecked(&chess_move);
 
-        let hasher = ChessHasher::new();
-        let hash = hasher.hash(&position);
-        let expected_hash = hasher.hash(&next_position);
-        let actual_hash = hasher.update_hash(hash, &position, &next_position, &chess_move);
+        let hash = CHESS_HASHER.hash(&position);
+        let expected_hash = CHESS_HASHER.hash(&next_position);
+        let actual_hash = CHESS_HASHER.update_hash(hash, &position, &next_position, &chess_move);
         println!("{}", expected_hash);
         assert_eq!(expected_hash, actual_hash);
     }

@@ -1,14 +1,15 @@
 use rad1::agent;
 use rad1::agent::ChessAgent;
+use rad1::game::Game;
 use shakmaty::*;
 
 fn main() {
-    let mut chess_game = Chess::default();
+    let mut chess_game = Game::default();
     let mut player1 = agent::command_line_agent(Color::White);
     let mut player2 = agent::naive_chess_agent(Color::Black, 6);
     let mut current_player = Color::White;
-    print_game(&chess_game);
-    while !chess_game.is_game_over() {
+    print_game(&chess_game.position);
+    while !chess_game.position.is_game_over() {
         match current_player {
             Color::White => {
                 chess_game = player1.take_turn(chess_game);
@@ -19,9 +20,9 @@ fn main() {
                 current_player = Color::White;
             }
         };
-        print_game(&chess_game);
+        print_game(&chess_game.position);
     }
-    println!("{:?}", chess_game.outcome());
+    println!("{:?}", chess_game.position.outcome());
 }
 
 fn print_game(game: &Chess) {

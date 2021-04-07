@@ -1,14 +1,16 @@
 use super::ChessAgent;
 use shakmaty::uci::Uci;
-use shakmaty::{Chess, Color, Move, Position};
+use shakmaty::{Color, Move};
 use std::io;
+
+use crate::game::Game;
 
 pub struct UciAgent {
     pub color: Color,
 }
 
 impl ChessAgent for UciAgent {
-    fn take_turn(&mut self, mut position: Chess) -> Chess {
+    fn take_turn(&mut self, game: Game) -> Game {
         let chess_move: Move;
         loop {
             println!("Please enter move (UCI notation)");
@@ -17,7 +19,7 @@ impl ChessAgent for UciAgent {
                 .read_line(&mut uci_move)
                 .expect("Failed to read line");
             match Uci::from_ascii(uci_move.trim().as_bytes()) {
-                Ok(uci) => match uci.to_move(&position) {
+                Ok(uci) => match uci.to_move(&game.position) {
                     Ok(m) => {
                         chess_move = m;
                         break;
@@ -27,7 +29,6 @@ impl ChessAgent for UciAgent {
                 Err(_uci_error) => println!("Failed to parse UCI string"),
             }
         }
-        position.play_unchecked(&chess_move);
-        position
+        game.play(&chess_move)
     }
 }

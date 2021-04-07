@@ -3,6 +3,8 @@ use shakmaty::{Chess, Color, Position, Role, Setup, Square};
 use std::cmp;
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 
+use crate::game::Game;
+
 pub struct NaiveChessAgent {
     pub color: Color,
     pub depth: usize,
@@ -180,17 +182,17 @@ fn min_alpha_beta(game: Chess, depth: usize, alpha: Value, mut beta: Value) -> V
 }
 
 impl ChessAgent for NaiveChessAgent {
-    fn take_turn(&mut self, mut position: Chess) -> Chess {
-        super::check_side_to_move(&self.color, &position);
-        let moves = position.legal_moves();
+    fn take_turn(&mut self, game: Game) -> Game {
+        super::check_side_to_move(self.color, &game);
+        let moves = game.position.legal_moves();
         let mut value;
         let mut alpha = Value::MIN;
         let mut beta = Value::MAX;
         let mut selected_move = moves[0].clone();
-        if Color::White == position.turn() {
+        if Color::White == game.position.turn() {
             value = Value::MIN;
             for chess_move in moves.iter() {
-                let mut child = position.clone();
+                let mut child = game.position.clone();
                 child.play_unchecked(chess_move);
 
                 let child_value = min_alpha_beta(child, self.depth - 1, alpha, beta);
@@ -203,7 +205,7 @@ impl ChessAgent for NaiveChessAgent {
         } else {
             value = Value::MAX;
             for chess_move in moves.iter() {
-                let mut child = position.clone();
+                let mut child = game.position.clone();
                 child.play_unchecked(chess_move);
                 let child_value = max_alpha_beta(child, self.depth - 1, alpha, beta);
                 if child_value < value {
@@ -216,7 +218,6 @@ impl ChessAgent for NaiveChessAgent {
                 }
             }
         }
-        position.play_unchecked(&selected_move);
-        position
+        game.play(&selected_move)
     }
 }

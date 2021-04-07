@@ -1,12 +1,14 @@
 use rand;
-use shakmaty::{Chess, Color, Position};
+use shakmaty::{Color, Setup};
+
+use crate::game::Game;
 
 mod naive;
 mod random;
 mod uci;
 
 pub trait ChessAgent {
-    fn take_turn(&mut self, position: Chess) -> Chess;
+    fn take_turn(&mut self, game: Game) -> Game;
 }
 
 pub fn random_chess_agent(color: Color) -> impl ChessAgent {
@@ -24,8 +26,8 @@ pub fn naive_chess_agent(color: Color, depth: usize) -> impl ChessAgent {
     naive::NaiveChessAgent { color, depth }
 }
 
-fn check_side_to_move(color: &Color, position: &impl Position) {
-    if position.turn() != *color {
+fn check_side_to_move(color: Color, game: &Game) {
+    if game.position.turn() != color {
         panic!("Wrong color's turn to move");
     }
 }

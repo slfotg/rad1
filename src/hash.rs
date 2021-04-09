@@ -50,7 +50,7 @@ pub struct ChessHasher {
 
 impl ChessHasher {
     pub fn default() -> Self {
-        let mut rng = RandomNumberGenerator::new(42);
+        let mut rng = RandomNumberGenerator::new(101);
         let mut random_numbers = [0; 781];
         for i in 0..781 {
             random_numbers[i] = rng.next_value();

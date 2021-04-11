@@ -23,7 +23,7 @@ pub fn command_line_agent(color: Color) -> impl ChessAgent {
 }
 
 pub fn naive_chess_agent(color: Color, depth: usize) -> impl ChessAgent {
-    naive::NaiveChessAgent { color, depth }
+    naive::NaiveChessAgent::new(color, depth)
 }
 
 fn check_side_to_move(color: Color, game: &Game) {

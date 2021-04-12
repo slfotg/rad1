@@ -6,11 +6,18 @@ use std::io;
 use crate::game::Game;
 
 pub struct UciAgent {
-    pub color: Color,
+    color: Color,
+}
+
+impl UciAgent {
+    pub fn new(color: Color) -> Self {
+        Self { color }
+    }
 }
 
 impl ChessAgent for UciAgent {
-    fn take_turn(&mut self, game: Game) -> Game {
+    fn take_turn(&self, game: Game) -> Game {
+        super::check_side_to_move(self.color, &game);
         let chess_move: Move;
         loop {
             println!("Please enter move (UCI notation)");

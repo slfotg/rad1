@@ -1,4 +1,3 @@
-use rand;
 use shakmaty::{Color, Setup};
 
 use crate::game::Game;
@@ -8,18 +7,15 @@ mod random;
 mod uci;
 
 pub trait ChessAgent {
-    fn take_turn(&mut self, game: Game) -> Game;
+    fn take_turn(&self, game: Game) -> Game;
 }
 
 pub fn random_chess_agent(color: Color) -> impl ChessAgent {
-    random::RandomChessAgent {
-        color,
-        rng: rand::thread_rng(),
-    }
+    random::RandomChessAgent::new(color)
 }
 
 pub fn command_line_agent(color: Color) -> impl ChessAgent {
-    uci::UciAgent { color }
+    uci::UciAgent::new(color)
 }
 
 pub fn naive_chess_agent(color: Color, depth: usize) -> impl ChessAgent {

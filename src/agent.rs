@@ -2,20 +2,25 @@ use shakmaty::{Color, Setup};
 
 use crate::game::Game;
 
+mod mcts;
 mod naive;
 mod random;
 mod uci;
 
 pub trait ChessAgent {
-    fn take_turn(&self, game: Game) -> Game;
+    fn take_turn(&mut self, game: Game) -> Game;
 }
 
-pub fn random_chess_agent(color: Color) -> impl ChessAgent {
-    random::RandomChessAgent::new(color)
+pub fn mcts_chess_agent(color: Color) -> impl ChessAgent {
+    mcts::MctsAgent::new(color)
+}
+
+pub fn random_chess_agent() -> impl ChessAgent {
+    random::RandomChessAgent::default()
 }
 
 pub fn command_line_agent(color: Color) -> impl ChessAgent {
-    uci::UciAgent::new(color)
+    uci::UciAgent { color }
 }
 
 pub fn naive_chess_agent(color: Color, depth: usize) -> impl ChessAgent {

@@ -5,8 +5,8 @@ use shakmaty::*;
 
 fn main() {
     let mut chess_game = Game::default();
-    let player1 = agent::command_line_agent(Color::White);
-    let player2 = agent::naive_chess_agent(Color::Black, 6);
+    let mut player1 = agent::command_line_agent(Color::White);
+    let mut player2 = agent::mcts_chess_agent(Color::Black);
     let mut current_player = Color::White;
     print_game(&chess_game.position);
     while !chess_game.position.is_game_over() {

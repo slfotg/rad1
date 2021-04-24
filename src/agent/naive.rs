@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::cmp;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use crate::game::Game;
 
@@ -59,16 +60,17 @@ impl Evaluator {
         let mut cache = self.cache.borrow_mut();
         cache.insert(game.hash, depth_and_eval);
     }
-
-    fn clear(&self) {
-        let mut cache = self.cache.borrow_mut();
-        *cache = HashMap::default();
-    }
 }
 
 struct Node {
     game: Game,
-    children: Vec<(Move, Option<RefCell<Node>>)>,
+    children: Vec<(Move, Option<Rc<RefCell<Node>>>)>,
+}
+
+impl Drop for Node {
+    fn drop(&mut self) {
+        //println!("drop");
+    }
 }
 
 impl Default for Node {
@@ -89,8 +91,8 @@ impl Node {
         self.children[0].0.clone()
     }
 
-    fn first_child(&mut self) -> RefCell<Self> {
-        self.children[0].1.take().unwrap()
+    fn first_child(&self) -> Rc<RefCell<Self>> {
+        Rc::clone(self.children[0].1.as_ref().unwrap())
     }
 
     fn is_expanded(&self) -> bool {
@@ -130,7 +132,7 @@ pub struct NaiveChessAgent {
     color: Color,
     depth: usize,
     evaluator: Evaluator,
-    head: RefCell<Node>,
+    head: Rc<RefCell<Node>>,
 }
 
 impl NaiveChessAgent {
@@ -139,25 +141,25 @@ impl NaiveChessAgent {
             color,
             depth,
             evaluator: Evaluator::default(),
-            head: RefCell::new(Node::default()),
+            head: Rc::new(RefCell::new(Node::default())),
         }
     }
 
-    fn update_head(&self, game: &Game) {
+    fn update_head(&mut self, game: &Game) {
         let mut updated = false;
-        let mut head_node = self.head.borrow_mut();
-        for (_, rc) in head_node.children.iter_mut() {
+        let head_node = Rc::clone(&self.head);
+        for (_, rc) in head_node.borrow().children.iter() {
             if let Some(node) = rc {
                 if node.borrow().game.hash == game.hash {
-                    *head_node = rc.take().unwrap().take();
+                    self.head = Rc::clone(node);
                     updated = true;
                     break;
                 }
             }
         }
         if !updated {
-            *head_node = Node::new(game.clone());
-            self.evaluator.clear();
+            self.head = Rc::new(RefCell::new(Node::new(game.clone())));
+            self.evaluator = Evaluator::default();
         }
     }
 
@@ -205,7 +207,9 @@ impl NaiveChessAgent {
         } else {
             for (child_move, child_node) in node.children.iter_mut() {
                 let mut child_node = child_node
-                    .get_or_insert_with(|| RefCell::new(Node::new(game.clone().play(&child_move))))
+                    .get_or_insert_with(|| {
+                        Rc::new(RefCell::new(Node::new(game.clone().play(&child_move))))
+                    })
                     .borrow_mut();
 
                 let child_value = -self
@@ -239,7 +243,7 @@ impl NaiveChessAgent {
 }
 
 impl ChessAgent for NaiveChessAgent {
-    fn take_turn(&self, game: Game) -> Game {
+    fn take_turn(&mut self, game: Game) -> Game {
         super::check_side_to_move(self.color, &game);
         self.update_head(&game);
         for i in 1..=self.depth {
@@ -249,10 +253,16 @@ impl ChessAgent for NaiveChessAgent {
                 Evaluation::MIN,
                 Evaluation::MAX,
             );
-            println!("{} - {}", i, self.head.borrow().best_move());
+            let game = self.head.borrow().first_child().borrow().game.clone();
+            println!(
+                "{} - {} = {:?}",
+                i,
+                self.head.borrow().best_move(),
+                self.evaluator.get_evaluation(&game).unwrap().value()
+            );
         }
-        let rc = self.head.borrow_mut().first_child();
-        *self.head.borrow_mut() = rc.take();
+        let rc = self.head.borrow().first_child();
+        self.head = rc;
         self.head.borrow().game.clone()
     }
 }

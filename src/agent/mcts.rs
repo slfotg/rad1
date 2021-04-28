@@ -93,17 +93,11 @@ impl Score {
         if self.games == 0.0 {
             f64::MAX
         } else {
-            self.exploitation_part(for_color)
-                + self.exploration_part(parent_games)
+            self.exploitation_part(for_color) + self.exploration_part(parent_games)
         }
     }
 
-    fn order_by_uct(
-        lhs: &Self,
-        rhs: &Self,
-        for_color: Color,
-        parent_games: f64,
-    ) -> Ordering {
+    fn order_by_uct(lhs: &Self, rhs: &Self, for_color: Color, parent_games: f64) -> Ordering {
         rhs.uct(for_color, parent_games)
             .partial_cmp(&lhs.uct(for_color, parent_games))
             .unwrap()
@@ -301,12 +295,7 @@ impl MctsAgent {
             let color = node.borrow().game.position.turn();
             let simulations = node.borrow().score.games;
             node.borrow_mut().children.sort_by(|lhs, rhs| {
-                Score::order_by_uct(
-                    &lhs.borrow().score,
-                    &rhs.borrow().score,
-                    color,
-                    simulations
-                )
+                Score::order_by_uct(&lhs.borrow().score, &rhs.borrow().score, color, simulations)
             });
             Self::update_simulations(&node.borrow().children[0])
         };

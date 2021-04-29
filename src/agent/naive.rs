@@ -14,18 +14,20 @@ use eval::Evaluation;
 const CACHE_SIZE: usize = 8388608;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum DepthAndEval {
+enum CachedEvaluation {
+    Empty,
     Exact(i64, usize, Evaluation),
     LowerBound(i64, usize, Evaluation),
     UpperBound(i64, usize, Evaluation),
 }
 
-impl DepthAndEval {
+impl CachedEvaluation {
     fn hash(&self) -> i64 {
         match *self {
             Self::Exact(hash, _, _) => hash,
             Self::LowerBound(hash, _, _) => hash,
             Self::UpperBound(hash, _, _) => hash,
+            _ => 0,
         }
     }
 
@@ -34,6 +36,7 @@ impl DepthAndEval {
             Self::Exact(_, depth, _) => depth,
             Self::LowerBound(_, depth, _) => depth,
             Self::UpperBound(_, depth, _) => depth,
+            _ => 0,
         }
     }
 
@@ -42,46 +45,68 @@ impl DepthAndEval {
             Self::Exact(_, _, value) => value,
             Self::LowerBound(_, _, value) => value,
             Self::UpperBound(_, _, value) => value,
+            _ => Evaluation::ZERO,
         }
     }
 }
 
 struct Evaluator {
-    cache: RefCell<Vec<Option<DepthAndEval>>>,
+    cache: RefCell<Vec<CachedEvaluation>>,
 }
 
 impl Default for Evaluator {
     fn default() -> Self {
         Self {
-            cache: RefCell::new(vec![None; CACHE_SIZE]),
+            cache: RefCell::new(vec![CachedEvaluation::Empty; CACHE_SIZE]),
         }
     }
 }
 
 impl Evaluator {
-    fn get_evaluation(&self, game: &Game) -> Option<DepthAndEval> {
+    fn get_evaluation(&self, game: &Game) -> CachedEvaluation {
         match self.cache.borrow()[(game.hash as usize) & (CACHE_SIZE - 1)] {
-            None => None,
+            CachedEvaluation::Empty => CachedEvaluation::Empty,
             val => {
-                if val.unwrap().hash() == game.hash {
+                if val.hash() == game.hash {
                     val
                 } else {
-                    None
+                    CachedEvaluation::Empty
                 }
             }
         }
     }
 
-    fn update_evaluation(&self, game: &Game, depth_and_eval: DepthAndEval) {
+    fn update_evaluation(&self, game: &Game, cached_eval: CachedEvaluation) {
         let mut cache = self.cache.borrow_mut();
-        cache[(game.hash as usize) & (CACHE_SIZE - 1)] = Some(depth_and_eval);
+        cache[(game.hash as usize) & (CACHE_SIZE - 1)] = cached_eval;
     }
 }
 
 struct Node {
     hash: i64,
     evaluation: Option<Evaluation>,
-    children: Vec<(Move, Option<Rc<RefCell<Node>>>)>,
+    children: Vec<LazyNode>,
+}
+
+struct LazyNode {
+    chess_move: Move,
+    node: Option<Rc<RefCell<Node>>>,
+}
+
+impl LazyNode {
+    fn new(chess_move: Move) -> Self {
+        Self {
+            chess_move,
+            node: None,
+        }
+    }
+
+    fn node(&mut self, game: &Game) -> Rc<RefCell<Node>> {
+        let chess_move = self.chess_move.clone();
+        self.node
+            .get_or_insert_with(|| Rc::new(RefCell::new(Node::new(game.clone().play(&chess_move)))))
+            .clone()
+    }
 }
 
 impl Default for Node {
@@ -100,11 +125,11 @@ impl Node {
     }
 
     fn best_move(&self) -> Move {
-        self.children[0].0.clone()
+        self.children[0].chess_move.clone()
     }
 
-    fn first_child(&self) -> Rc<RefCell<Self>> {
-        Rc::clone(self.children[0].1.as_ref().unwrap())
+    fn first_child(&mut self, game: &Game) -> Rc<RefCell<Self>> {
+        self.children[0].node(game)
     }
 
     fn is_expanded(&self) -> bool {
@@ -114,8 +139,8 @@ impl Node {
     fn expand(&mut self, game: &Game) {
         if !self.is_expanded() {
             let moves = game.position.legal_moves();
-            for m in moves.iter() {
-                self.children.push((m.clone(), None));
+            for m in moves.into_iter() {
+                self.children.push(LazyNode::new(m));
             }
         }
     }
@@ -123,7 +148,7 @@ impl Node {
     fn size(&self) -> usize {
         let mut size = 1;
         for i in 0..self.children.len() {
-            size += match &self.children[i].1 {
+            size += match &self.children[i].node {
                 None => 0,
                 Some(node) => node.borrow().size(),
             };
@@ -131,20 +156,21 @@ impl Node {
         size
     }
 
-    fn sort_children(&mut self) {
-        self.children.sort_by(|a, b| match (&a.1, &b.1) {
-            (None, None) => Ordering::Equal,
-            (None, _) => Ordering::Greater,
-            (Some(_), None) => Ordering::Less,
-            (Some(node_a), Some(node_b)) => {
-                match (node_a.borrow().evaluation, node_b.borrow().evaluation) {
-                    (None, None) => Ordering::Equal,
-                    (None, _) => Ordering::Greater,
-                    (Some(_), None) => Ordering::Less,
-                    (Some(a_val), Some(b_val)) => a_val.cmp(&b_val),
+    fn sort_children_by_evaluation(&mut self) {
+        self.children
+            .sort_by(|a, b| match (a.node.as_ref(), b.node.as_ref()) {
+                (None, None) => Ordering::Equal,
+                (None, _) => Ordering::Greater,
+                (Some(_), None) => Ordering::Less,
+                (Some(node_a), Some(node_b)) => {
+                    match (node_a.borrow().evaluation, node_b.borrow().evaluation) {
+                        (None, None) => Ordering::Equal,
+                        (None, _) => Ordering::Greater,
+                        (Some(_), None) => Ordering::Less,
+                        (Some(a_val), Some(b_val)) => a_val.cmp(&b_val),
+                    }
                 }
-            }
-        });
+            });
     }
 }
 
@@ -172,10 +198,11 @@ impl NaiveChessAgent {
     fn update_head(&mut self, game: &Game) {
         let mut updated = false;
         let head_node = Rc::clone(&self.head);
-        for (_, rc) in head_node.borrow().children.iter() {
-            if let Some(node) = rc {
+        for i in 0..head_node.borrow().children.len() {
+            let child = &head_node.borrow().children[i];
+            if let Some(node) = &child.node {
                 if node.borrow().hash == game.hash {
-                    self.head = Rc::clone(node);
+                    self.head = Rc::clone(&node);
                     updated = true;
                     break;
                 }
@@ -184,6 +211,38 @@ impl NaiveChessAgent {
         if !updated {
             self.head = Rc::new(RefCell::new(Node::new(game.clone())));
             self.evaluator = Evaluator::default();
+        }
+    }
+
+    fn cached_evaluation(
+        &self,
+        game: &Game,
+        depth: usize,
+        value: &mut Evaluation,
+        alpha: &mut Evaluation,
+        beta: &mut Evaluation,
+    ) -> Option<Evaluation> {
+        match self.evaluator.get_evaluation(game) {
+            CachedEvaluation::Empty => None,
+            cached_eval => {
+                if cached_eval.depth() >= depth {
+                    *value = cached_eval.value();
+                    match cached_eval {
+                        CachedEvaluation::Exact(_, _, evaluation) => Some(evaluation),
+                        CachedEvaluation::LowerBound(_, _, evaluation) => {
+                            *alpha = cmp::max(*alpha, evaluation);
+                            None
+                        }
+                        CachedEvaluation::UpperBound(_, _, evaluation) => {
+                            *beta = cmp::max(*beta, evaluation);
+                            None
+                        }
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            }
         }
     }
 
@@ -196,53 +255,30 @@ impl NaiveChessAgent {
         mut beta: Evaluation,
     ) -> Evaluation {
         if game.position.is_check() && depth > 0 {
-            depth -= 1;
+            depth += 1;
         }
         let alpha_orig = alpha;
         let mut value = Evaluation::MIN;
         if depth > 0 {
-            node.expand(&game);
+            node.expand(game);
         }
-        let evaluation = match self.evaluator.get_evaluation(&game) {
-            None => None,
-            Some(depth_and_eval) => {
-                if depth_and_eval.depth() >= depth {
-                    value = depth_and_eval.value();
-                    match depth_and_eval {
-                        DepthAndEval::Exact(_, _, evaluation) => Some(evaluation),
-                        DepthAndEval::LowerBound(_, _, evaluation) => {
-                            alpha = cmp::max(alpha, evaluation);
-                            None
-                        }
-                        DepthAndEval::UpperBound(_, _, evaluation) => {
-                            beta = cmp::max(beta, evaluation);
-                            None
-                        }
-                    }
-                } else {
-                    None
-                }
-            }
-        };
-        let value = if let Some(evaluation) = evaluation {
+        let cached_evaluation =
+            self.cached_evaluation(game, depth, &mut value, &mut alpha, &mut beta);
+        let value = if let Some(evaluation) = cached_evaluation {
             evaluation
         } else if depth == 0 || game.position.is_game_over() {
-            let value = Evaluation::evaluate(&game);
+            let value = Evaluation::evaluate(game);
             self.evaluator
-                .update_evaluation(&game, DepthAndEval::Exact(game.hash, depth, value));
+                .update_evaluation(game, CachedEvaluation::Exact(game.hash, depth, value));
             value
         } else {
-            for (child_move, child_node) in node.children.iter_mut() {
-                let mut child_node = child_node
-                    .get_or_insert_with(|| {
-                        Rc::new(RefCell::new(Node::new(game.clone().play(&child_move))))
-                    })
-                    .borrow_mut();
+            for child_node in node.children.iter_mut() {
+                let child_move = child_node.chess_move.clone();
 
                 let child_value = -self
                     .alpha_beta(
                         &game.play(&child_move),
-                        &mut child_node,
+                        &mut child_node.node(game).borrow_mut(),
                         depth - 1,
                         -beta.decrement(),
                         -alpha.decrement(),
@@ -254,15 +290,15 @@ impl NaiveChessAgent {
                     break;
                 }
             }
-            node.sort_children();
-            let depth_and_eval = if value <= alpha_orig {
-                DepthAndEval::UpperBound(game.hash, depth, value)
+            node.sort_children_by_evaluation();
+            let cached_eval = if value <= alpha_orig {
+                CachedEvaluation::UpperBound(game.hash, depth, value)
             } else if value >= beta {
-                DepthAndEval::LowerBound(game.hash, depth, value)
+                CachedEvaluation::LowerBound(game.hash, depth, value)
             } else {
-                DepthAndEval::Exact(game.hash, depth, value)
+                CachedEvaluation::Exact(game.hash, depth, value)
             };
-            self.evaluator.update_evaluation(&game, depth_and_eval);
+            self.evaluator.update_evaluation(&game, cached_eval);
             value
         };
         node.evaluation = Some(value);
@@ -296,7 +332,7 @@ impl ChessAgent for NaiveChessAgent {
         println!("Size: {}", self.size());
 
         // update head of tree
-        let rc = self.head.borrow().first_child();
+        let rc = self.head.borrow_mut().first_child(&game);
         self.head = rc;
         game.play(&m)
     }

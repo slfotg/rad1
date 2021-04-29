@@ -70,7 +70,7 @@ impl PartialOrd for Evaluation {
 impl Evaluation {
     pub const MIN: Self = Self::Lose(0);
     pub const MAX: Self = Self::Win(0);
-    const _ZERO: Self = Self::Heuristic(0);
+    pub const ZERO: Self = Self::Heuristic(0);
     const PIECE_VALUES: [i16; 7] = [0, 10, 30, 30, 50, 90, 0];
     const PIECE_FACTORS: [i16; 7] = [0, 1, 1, 1, 1, 1, 0];
     const COLOR_FACTORS: [i16; 2] = [-1, 1];
@@ -190,7 +190,7 @@ mod tests {
     #[test_case( Evaluation::Win(8)           , Evaluation::Lose(8)            ; "win"       )]
     #[test_case( Evaluation::Lose(8)          , Evaluation::Win(8)             ; "lose"      )]
     #[test_case( Evaluation::Draw(0)          , Evaluation::Draw(0)            ; "draw"      )]
-    #[test_case( Evaluation::_ZERO            , Evaluation::_ZERO              ; "zero"      )]
+    #[test_case( Evaluation::ZERO             , Evaluation::ZERO               ; "zero"      )]
     #[test_case( Evaluation::Heuristic(32)    , Evaluation::Heuristic(-32)     ; "heuristic" )]
     fn neg(evaluation: Evaluation, expected: Evaluation) {
         assert_eq!(-evaluation, expected);
@@ -203,17 +203,17 @@ mod tests {
     #[test_case( Evaluation::Lose(5)        , Evaluation::Lose(5)           , Ordering::Equal  ; "lose eq"           )]
     #[test_case( Evaluation::Lose(5)        , Evaluation::Lose(4)           , Ordering::Greater; "lose gt"           )]
     #[test_case( Evaluation::Heuristic(45)  , Evaluation::Heuristic(45)     , Ordering::Equal  ; "heuristic eq"      )]
-    #[test_case( Evaluation::_ZERO          , Evaluation::_ZERO             , Ordering::Equal  ; "zero eq"           )]
+    #[test_case( Evaluation::ZERO           , Evaluation::ZERO              , Ordering::Equal  ; "zero eq"           )]
     #[test_case( Evaluation::Win(2)         , Evaluation::Lose(2)           , Ordering::Greater; "win gt lose"       )]
     #[test_case( Evaluation::Win(2)         , Evaluation::Draw(2)           , Ordering::Greater; "win gt draw"       )]
     #[test_case( Evaluation::Lose(2)        , Evaluation::Draw(2)           , Ordering::Less   ; "lose lt draw"      )]
     #[test_case( Evaluation::Lose(2)        , Evaluation::Win(2)            , Ordering::Less   ; "lose lt win"       )]
-    #[test_case( Evaluation::Lose(2)        , Evaluation::_ZERO             , Ordering::Less   ; "lose lt zero"      )]
+    #[test_case( Evaluation::Lose(2)        , Evaluation::ZERO              , Ordering::Less   ; "lose lt zero"      )]
     #[test_case( Evaluation::Lose(2)        , Evaluation::Heuristic(-88)    , Ordering::Less   ; "lose lt heuristic" )]
     #[test_case( Evaluation::Draw(2)        , Evaluation::Lose(2)           , Ordering::Greater; "draw gt lose"      )]
     #[test_case( Evaluation::Draw(2)        , Evaluation::Win(2)            , Ordering::Less   ; "draw lt win"       )]
-    #[test_case( Evaluation::Draw(2)        , Evaluation::_ZERO             , Ordering::Less   ; "draw lt zero"      )]
-    #[test_case( Evaluation::_ZERO          , Evaluation::Draw(2)           , Ordering::Greater; "zero gt draw"      )]
+    #[test_case( Evaluation::Draw(2)        , Evaluation::ZERO              , Ordering::Less   ; "draw lt zero"      )]
+    #[test_case( Evaluation::ZERO           , Evaluation::Draw(2)           , Ordering::Greater; "zero gt draw"      )]
     #[test_case( Evaluation::Heuristic(1)   , Evaluation::Draw(2)           , Ordering::Greater; "1 0 gt draw"       )]
     #[test_case( Evaluation::Heuristic(1)   , Evaluation::Heuristic(0)      , Ordering::Greater; "1 0 gt 0 0"        )]
     fn cmp(left: Evaluation, right: Evaluation, expected: Ordering) {
@@ -224,10 +224,10 @@ mod tests {
     #[test]
     fn ordering() {
         let mut evals = vec![
-            Evaluation::_ZERO,
+            Evaluation::ZERO,
             Evaluation::Win(3),
             Evaluation::Draw(0),
-            Evaluation::_ZERO,
+            Evaluation::ZERO,
             Evaluation::Heuristic(1),
             Evaluation::Heuristic(-4),
             Evaluation::Heuristic(0),
@@ -253,9 +253,9 @@ mod tests {
                 Evaluation::Heuristic(-4),
                 Evaluation::Draw(0),
                 Evaluation::Draw(1),
-                Evaluation::_ZERO,
-                Evaluation::_ZERO,
-                Evaluation::_ZERO,
+                Evaluation::ZERO,
+                Evaluation::ZERO,
+                Evaluation::ZERO,
                 Evaluation::Heuristic(1),
                 Evaluation::Heuristic(10),
                 Evaluation::Heuristic(13),

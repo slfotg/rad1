@@ -288,7 +288,9 @@ impl NaiveChessAgent {
             self.cached_evaluation(game, depth, &mut value, &mut alpha, &mut beta);
         let value = if let Some(evaluation) = cached_evaluation {
             evaluation
-        } else if depth == 0 || game.position.is_game_over() {
+        } else if game.position.is_game_over() {
+            Evaluation::evaluate(game)
+        } else if depth == 0 {
             let value = self.q_search(game, alpha, beta);
             self.evaluator
                 .update_evaluation(game, CachedEvaluation::Exact(game.hash(), depth, value));

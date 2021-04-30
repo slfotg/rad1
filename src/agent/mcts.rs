@@ -1,6 +1,4 @@
 use super::ChessAgent;
-use rand::distributions::WeightedIndex;
-use rand::prelude::*;
 use rand::seq::SliceRandom;
 use shakmaty::*;
 use std::cell::RefCell;
@@ -108,47 +106,6 @@ impl Score {
     }
 }
 
-struct Evaluation {}
-
-impl Evaluation {
-    const PIECE_VALUES: [f64; 7] = [0.0, 1.0, 3.0, 3.0, 5.0, 9.0, 0.0];
-
-    #[inline]
-    fn piece_value(piece: &Piece) -> f64 {
-        Self::PIECE_VALUES[usize::from(piece.role)]
-    }
-
-    #[inline]
-    fn evaluate(game: &Game, color: Color) -> f64 {
-        if game.position.is_game_over() {
-            match game.position.outcome().unwrap().winner() {
-                Option::None => 0.5,
-                Option::Some(c) => {
-                    if color == c {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-            }
-        } else {
-            let mut white_value = 0.0;
-            let mut black_value = 0.0;
-            for (_, piece) in game.position.board().pieces() {
-                match piece.color {
-                    Color::White => white_value += Self::piece_value(&piece),
-                    _ => black_value += Self::piece_value(&piece),
-                }
-            }
-            let sum_value = white_value + black_value;
-            match color {
-                Color::White => white_value / sum_value,
-                _ => black_value / sum_value,
-            }
-        }
-    }
-}
-
 struct Node {
     game: Game,
     score: Score,
@@ -196,44 +153,6 @@ impl Node {
             .map(|m| RefCell::new(Node::new(self.game.play(&m))))
             .collect();
         self.children.shuffle(&mut rng);
-    }
-
-    fn _weighted_simulation(&self) -> Score {
-        let mut result = Outcome::Draw;
-        let mut game = self.game.clone();
-        for _ in 0..200 {
-            if game.position.is_game_over() {
-                result = game.position.outcome().unwrap();
-                break;
-            }
-            let resulting_games: Vec<Game> = game
-                .position
-                .legal_moves()
-                .iter()
-                .map(|m| game.play(m))
-                .collect();
-            let weights: Vec<f64> = resulting_games
-                .iter()
-                .map(|g| Evaluation::evaluate(&g, game.position.turn()))
-                .collect();
-            let max_weight = weights.iter().cloned().fold(0.0, f64::max);
-            if max_weight == 0.0 {
-                result = Outcome::Decisive {
-                    winner: !game.position.turn(),
-                };
-                break;
-            } else if max_weight == 1.0 {
-                result = Outcome::Decisive {
-                    winner: game.position.turn(),
-                };
-                break;
-            } else {
-                let dist = WeightedIndex::new(&weights).unwrap();
-                let mut rng = rand::thread_rng();
-                game = resulting_games[dist.sample(&mut rng)].clone();
-            }
-        }
-        Score::new(&result)
     }
 
     fn random_simulation(&self) -> Score {

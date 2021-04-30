@@ -64,10 +64,10 @@ impl Default for Evaluator {
 
 impl Evaluator {
     fn get_evaluation(&self, game: &Game) -> CachedEvaluation {
-        match self.cache.borrow()[(game.hash as usize) & (CACHE_SIZE - 1)] {
+        match self.cache.borrow()[(game.hash() as usize) & (CACHE_SIZE - 1)] {
             CachedEvaluation::Empty => CachedEvaluation::Empty,
             val => {
-                if val.hash() == game.hash {
+                if val.hash() == game.hash() {
                     val
                 } else {
                     CachedEvaluation::Empty
@@ -78,7 +78,7 @@ impl Evaluator {
 
     fn update_evaluation(&self, game: &Game, cached_eval: CachedEvaluation) {
         let mut cache = self.cache.borrow_mut();
-        cache[(game.hash as usize) & (CACHE_SIZE - 1)] = cached_eval;
+        cache[(game.hash() as usize) & (CACHE_SIZE - 1)] = cached_eval;
     }
 }
 
@@ -104,7 +104,7 @@ impl LazyNode {
     fn node(&mut self, game: &Game) -> Rc<RefCell<Node>> {
         let chess_move = self.chess_move.clone();
         self.node
-            .get_or_insert_with(|| Rc::new(RefCell::new(Node::new(game.clone().play(&chess_move)))))
+            .get_or_insert_with(|| Rc::new(RefCell::new(Node::new(game.play(&chess_move)))))
             .clone()
     }
 }
@@ -118,7 +118,7 @@ impl Default for Node {
 impl Node {
     fn new(game: Game) -> Self {
         Self {
-            hash: game.hash,
+            hash: game.hash(),
             evaluation: None,
             children: vec![],
         }
@@ -138,7 +138,7 @@ impl Node {
 
     fn expand(&mut self, game: &Game) {
         if !self.is_expanded() {
-            let moves = game.position.legal_moves();
+            let moves = game.sorted_moves();
             for m in moves.into_iter() {
                 self.children.push(LazyNode::new(m));
             }
@@ -201,7 +201,7 @@ impl NaiveChessAgent {
         for i in 0..head_node.borrow().children.len() {
             let child = &head_node.borrow().children[i];
             if let Some(node) = &child.node {
-                if node.borrow().hash == game.hash {
+                if node.borrow().hash == game.hash() {
                     self.head = Rc::clone(&node);
                     updated = true;
                     break;
@@ -246,6 +246,28 @@ impl NaiveChessAgent {
         }
     }
 
+    fn q_search(&self, game: &Game, mut alpha: Evaluation, beta: Evaluation) -> Evaluation {
+        let evaluation = Evaluation::evaluate(game);
+        if evaluation >= beta {
+            beta
+        } else {
+            if alpha < evaluation {
+                alpha = evaluation;
+            }
+            for m in game.sorted_captures().into_iter() {
+                let score = -self.q_search(&game.play(&m), -beta, -alpha).increment();
+                if score >= beta {
+                    alpha = beta;
+                    break;
+                }
+                if score > alpha {
+                    alpha = score;
+                }
+            }
+            alpha
+        }
+    }
+
     fn alpha_beta(
         &self,
         game: &Game,
@@ -267,9 +289,9 @@ impl NaiveChessAgent {
         let value = if let Some(evaluation) = cached_evaluation {
             evaluation
         } else if depth == 0 || game.position.is_game_over() {
-            let value = Evaluation::evaluate(game);
+            let value = self.q_search(game, alpha, beta);
             self.evaluator
-                .update_evaluation(game, CachedEvaluation::Exact(game.hash, depth, value));
+                .update_evaluation(game, CachedEvaluation::Exact(game.hash(), depth, value));
             value
         } else {
             for child_node in node.children.iter_mut() {
@@ -292,11 +314,11 @@ impl NaiveChessAgent {
             }
             node.sort_children_by_evaluation();
             let cached_eval = if value <= alpha_orig {
-                CachedEvaluation::UpperBound(game.hash, depth, value)
+                CachedEvaluation::UpperBound(game.hash(), depth, value)
             } else if value >= beta {
-                CachedEvaluation::LowerBound(game.hash, depth, value)
+                CachedEvaluation::LowerBound(game.hash(), depth, value)
             } else {
-                CachedEvaluation::Exact(game.hash, depth, value)
+                CachedEvaluation::Exact(game.hash(), depth, value)
             };
             self.evaluator.update_evaluation(&game, cached_eval);
             value

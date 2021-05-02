@@ -1,34 +1,23 @@
-use shakmaty::{Color, Setup};
+use shakmaty::Move;
 
 use crate::game::Game;
 
-mod mcts;
 mod naive;
 mod random;
 mod uci;
 
 pub trait ChessAgent {
-    fn take_turn(&mut self, game: Game) -> Game;
-}
-
-pub fn mcts_chess_agent(color: Color) -> impl ChessAgent {
-    mcts::MctsAgent::new(color)
+    fn best_move(&mut self, game: &Game) -> Move;
 }
 
 pub fn random_chess_agent() -> impl ChessAgent {
     random::RandomChessAgent::default()
 }
 
-pub fn command_line_agent(color: Color) -> impl ChessAgent {
-    uci::UciAgent { color }
+pub fn command_line_agent() -> impl ChessAgent {
+    uci::UciAgent::default()
 }
 
-pub fn naive_chess_agent(color: Color, depth: usize) -> impl ChessAgent {
-    naive::NaiveChessAgent::new(color, depth)
-}
-
-fn check_side_to_move(color: Color, game: &Game) {
-    if game.position.turn() != color {
-        panic!("Wrong color's turn to move");
-    }
+pub fn naive_chess_agent(depth: usize) -> impl ChessAgent {
+    naive::NaiveChessAgent::new(depth)
 }

@@ -1,7 +1,7 @@
 use super::ChessAgent;
 use rand::rngs::ThreadRng;
 use rand::Rng;
-use shakmaty::Position;
+use shakmaty::{Move, Position};
 
 use crate::game::Game;
 
@@ -18,9 +18,8 @@ impl Default for RandomChessAgent {
 }
 
 impl ChessAgent for RandomChessAgent {
-    fn take_turn(&mut self, mut game: Game) -> Game {
+    fn best_move(&mut self, game: &Game) -> Move {
         let moves = game.position.legal_moves();
-        game.play_mut(&moves[self.rng.gen_range(0..moves.len())]);
-        game
+        moves[self.rng.gen_range(0..moves.len())].clone()
     }
 }

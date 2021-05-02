@@ -5,21 +5,22 @@ use shakmaty::*;
 
 fn main() {
     let mut chess_game = Game::default();
-    let mut player1 = agent::command_line_agent(Color::White);
-    let mut player2 = agent::naive_chess_agent(Color::Black, 6);
+    let mut player1 = agent::command_line_agent();
+    let mut player2 = agent::naive_chess_agent(8);
     let mut current_player = Color::White;
     print_game(&chess_game.position);
     while !chess_game.position.is_game_over() {
-        match current_player {
+        let best_move = match current_player {
             Color::White => {
-                chess_game = player1.take_turn(chess_game);
                 current_player = Color::Black;
+                player1.best_move(&chess_game)
             }
             Color::Black => {
-                chess_game = player2.take_turn(chess_game);
                 current_player = Color::White;
+                player2.best_move(&chess_game)
             }
         };
+        chess_game.play_mut(&best_move);
         print_game(&chess_game.position);
     }
     println!("{:?}", chess_game.position.outcome());

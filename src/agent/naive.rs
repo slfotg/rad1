@@ -1,5 +1,5 @@
 use super::ChessAgent;
-use shakmaty::{Color, Move, Position};
+use shakmaty::{Move, Position};
 use std::cell::RefCell;
 use std::cmp;
 use std::cmp::Ordering;
@@ -175,16 +175,14 @@ impl Node {
 }
 
 pub struct NaiveChessAgent {
-    color: Color,
     depth: usize,
     evaluator: Evaluator,
     head: Rc<RefCell<Node>>,
 }
 
 impl NaiveChessAgent {
-    pub fn new(color: Color, depth: usize) -> Self {
+    pub fn new(depth: usize) -> Self {
         Self {
-            color,
             depth,
             evaluator: Evaluator::default(),
             head: Rc::new(RefCell::new(Node::default())),
@@ -331,8 +329,7 @@ impl NaiveChessAgent {
 }
 
 impl ChessAgent for NaiveChessAgent {
-    fn take_turn(&mut self, game: Game) -> Game {
-        super::check_side_to_move(self.color, &game);
+    fn best_move(&mut self, game: &Game) -> Move {
         self.update_head(&game);
         for i in 1..=self.depth {
             self.alpha_beta(
@@ -351,13 +348,13 @@ impl ChessAgent for NaiveChessAgent {
         }
 
         // get best move
-        let m = self.head.borrow().best_move();
-        println!("Best move: {}", m);
+        let best_move = self.head.borrow().best_move();
+        println!("Best move: {}", best_move);
         println!("Size: {}", self.size());
 
         // update head of tree
         let rc = self.head.borrow_mut().first_child(&game);
         self.head = rc;
-        game.play(&m)
+        best_move
     }
 }

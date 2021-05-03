@@ -3,7 +3,6 @@ use shakmaty::{Move, Position};
 use std::cell::RefCell;
 use std::cmp;
 use std::cmp::Ordering;
-use std::rc::Rc;
 
 use crate::game::Game;
 
@@ -90,7 +89,7 @@ struct Node {
 
 struct LazyNode {
     chess_move: Move,
-    node: Option<Rc<RefCell<Node>>>,
+    node: Option<RefCell<Node>>,
 }
 
 impl LazyNode {
@@ -101,11 +100,10 @@ impl LazyNode {
         }
     }
 
-    fn node(&mut self, game: &Game) -> Rc<RefCell<Node>> {
+    fn node(&mut self, game: &Game) -> &RefCell<Node> {
         let chess_move = self.chess_move.clone();
         self.node
-            .get_or_insert_with(|| Rc::new(RefCell::new(Node::new(game.play(&chess_move)))))
-            .clone()
+            .get_or_insert_with(|| RefCell::new(Node::new(game.play(&chess_move))))
     }
 }
 
@@ -128,8 +126,19 @@ impl Node {
         self.children[0].chess_move.clone()
     }
 
-    fn first_child(&mut self, game: &Game) -> Rc<RefCell<Self>> {
-        self.children[0].node(game)
+    fn first_child(&mut self) -> Option<RefCell<Self>> {
+        self.children[0].node.take()
+    }
+
+    fn find_child(&mut self, game: &Game) -> Option<RefCell<Self>> {
+        for i in 0..self.children.len() {
+            if let Some(node) = &self.children[i].node {
+                if node.borrow().hash == game.hash() {
+                    return self.children[i].node.take();
+                }
+            }
+        }
+        None
     }
 
     fn is_expanded(&self) -> bool {
@@ -177,7 +186,7 @@ impl Node {
 pub struct NaiveChessAgent {
     depth: usize,
     evaluator: Evaluator,
-    head: Rc<RefCell<Node>>,
+    head: RefCell<Node>,
 }
 
 impl NaiveChessAgent {
@@ -185,7 +194,7 @@ impl NaiveChessAgent {
         Self {
             depth,
             evaluator: Evaluator::default(),
-            head: Rc::new(RefCell::new(Node::default())),
+            head: RefCell::new(Node::default()),
         }
     }
 
@@ -195,19 +204,13 @@ impl NaiveChessAgent {
 
     fn update_head(&mut self, game: &Game) {
         let mut updated = false;
-        let head_node = Rc::clone(&self.head);
-        for i in 0..head_node.borrow().children.len() {
-            let child = &head_node.borrow().children[i];
-            if let Some(node) = &child.node {
-                if node.borrow().hash == game.hash() {
-                    self.head = Rc::clone(&node);
-                    updated = true;
-                    break;
-                }
-            }
+        let child = self.head.borrow_mut().find_child(game);
+        if let Some(node) = child {
+            self.head = node;
+            updated = true;
         }
         if !updated {
-            self.head = Rc::new(RefCell::new(Node::new(game.clone())));
+            self.head = RefCell::new(Node::new(game.clone()));
             self.evaluator = Evaluator::default();
         }
     }
@@ -353,8 +356,8 @@ impl ChessAgent for NaiveChessAgent {
         println!("Size: {}", self.size());
 
         // update head of tree
-        let rc = self.head.borrow_mut().first_child(&game);
-        self.head = rc;
+        let first_child = self.head.borrow_mut().first_child();
+        self.head = first_child.unwrap();
         best_move
     }
 }

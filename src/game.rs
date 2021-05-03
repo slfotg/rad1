@@ -22,6 +22,7 @@ impl Game {
         Self { position, hash }
     }
 
+    #[inline]
     pub fn hash(&self) -> i64 {
         self.hash
     }
@@ -41,6 +42,7 @@ impl Game {
         next_game
     }
 
+    #[inline]
     pub fn legal_moves(&self) -> MoveList {
         self.position.legal_moves()
     }

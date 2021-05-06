@@ -13,9 +13,9 @@ const CACHE_SIZE: usize = CACHE_SIZE_U64 as usize;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CachedEvaluation {
     Empty,
-    Exact(u64, usize, Evaluation),
-    LowerBound(u64, usize, Evaluation),
-    UpperBound(u64, usize, Evaluation),
+    Exact(u64, usize, i16),
+    LowerBound(u64, usize, i16),
+    UpperBound(u64, usize, i16),
 }
 
 impl CachedEvaluation {
@@ -37,7 +37,7 @@ impl CachedEvaluation {
         }
     }
 
-    fn value(&self) -> Evaluation {
+    fn value(&self) -> i16 {
         match *self {
             Self::Exact(_, _, value) => value,
             Self::LowerBound(_, _, value) => value,
@@ -81,7 +81,7 @@ impl Evaluator {
 
 struct Node {
     hash: u64,
-    evaluation: Option<Evaluation>,
+    evaluation: Option<i16>,
     children: Vec<LazyNode>,
 }
 
@@ -217,10 +217,10 @@ impl NaiveChessAgent {
         &self,
         game: &Game,
         depth: usize,
-        value: &mut Evaluation,
-        alpha: &mut Evaluation,
-        beta: &mut Evaluation,
-    ) -> Option<Evaluation> {
+        value: &mut i16,
+        alpha: &mut i16,
+        beta: &mut i16,
+    ) -> Option<i16> {
         match self.evaluator.get_evaluation(game) {
             CachedEvaluation::Empty => None,
             cached_eval => {
@@ -245,7 +245,7 @@ impl NaiveChessAgent {
         }
     }
 
-    fn q_search(&self, game: &Game, mut alpha: Evaluation, beta: Evaluation) -> Evaluation {
+    fn q_search(&self, game: &Game, mut alpha: i16, beta: i16) -> i16 {
         let evaluation = Evaluation::evaluate(game);
         if evaluation >= beta {
             beta
@@ -254,7 +254,7 @@ impl NaiveChessAgent {
                 alpha = evaluation;
             }
             for m in game.sorted_captures().into_iter() {
-                let score = -self.q_search(&game.play(&m), -beta, -alpha).increment();
+                let score = -self.q_search(&game.play(&m), -beta, -alpha);
                 if score >= beta {
                     alpha = beta;
                     break;
@@ -272,9 +272,9 @@ impl NaiveChessAgent {
         game: &Game,
         node: &mut Node,
         mut depth: usize,
-        mut alpha: Evaluation,
-        mut beta: Evaluation,
-    ) -> Evaluation {
+        mut alpha: i16,
+        mut beta: i16,
+    ) -> i16 {
         if game.position.is_check() && depth > 0 {
             depth += 1;
         }
@@ -298,15 +298,13 @@ impl NaiveChessAgent {
             for child_node in node.children.iter_mut() {
                 let child_move = child_node.chess_move.clone();
 
-                let child_value = -self
-                    .alpha_beta(
-                        &game.play(&child_move),
-                        &mut child_node.node(game).borrow_mut(),
-                        depth - 1,
-                        -beta.decrement(),
-                        -alpha.decrement(),
-                    )
-                    .increment();
+                let child_value = -self.alpha_beta(
+                    &game.play(&child_move),
+                    &mut child_node.node(game).borrow_mut(),
+                    depth - 1,
+                    -beta,
+                    -alpha,
+                );
                 value = cmp::max(child_value, value);
                 alpha = cmp::max(alpha, value);
                 if alpha >= beta {

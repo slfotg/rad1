@@ -6,7 +6,7 @@ use crate::hash::CHESS_HASHER;
 #[derive(Debug, Clone)]
 pub struct Game {
     pub position: Chess,
-    pub hash: i64,
+    pub hash: u64,
 }
 
 impl Default for Game {
@@ -18,12 +18,12 @@ impl Default for Game {
 }
 
 impl Game {
-    pub fn new(position: Chess, hash: i64) -> Self {
+    pub fn new(position: Chess, hash: u64) -> Self {
         Self { position, hash }
     }
 
     #[inline]
-    pub fn hash(&self) -> i64 {
+    pub fn hash(&self) -> u64 {
         self.hash
     }
 

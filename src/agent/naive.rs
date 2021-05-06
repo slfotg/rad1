@@ -4,24 +4,22 @@ use std::cell::RefCell;
 use std::cmp;
 use std::cmp::Ordering;
 
+use crate::eval::Evaluation;
 use crate::game::Game;
 
-mod eval;
-
-use eval::Evaluation;
-
-const CACHE_SIZE: usize = 8388608;
+const CACHE_SIZE_U64: u64 = 16777216;
+const CACHE_SIZE: usize = CACHE_SIZE_U64 as usize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CachedEvaluation {
     Empty,
-    Exact(i64, usize, Evaluation),
-    LowerBound(i64, usize, Evaluation),
-    UpperBound(i64, usize, Evaluation),
+    Exact(u64, usize, Evaluation),
+    LowerBound(u64, usize, Evaluation),
+    UpperBound(u64, usize, Evaluation),
 }
 
 impl CachedEvaluation {
-    fn hash(&self) -> i64 {
+    fn hash(&self) -> u64 {
         match *self {
             Self::Exact(hash, _, _) => hash,
             Self::LowerBound(hash, _, _) => hash,
@@ -63,7 +61,7 @@ impl Default for Evaluator {
 
 impl Evaluator {
     fn get_evaluation(&self, game: &Game) -> CachedEvaluation {
-        match self.cache.borrow()[(game.hash() as usize) & (CACHE_SIZE - 1)] {
+        match self.cache.borrow()[(game.hash() % CACHE_SIZE_U64) as usize] {
             CachedEvaluation::Empty => CachedEvaluation::Empty,
             val => {
                 if val.hash() == game.hash() {
@@ -82,7 +80,7 @@ impl Evaluator {
 }
 
 struct Node {
-    hash: i64,
+    hash: u64,
     evaluation: Option<Evaluation>,
     children: Vec<LazyNode>,
 }

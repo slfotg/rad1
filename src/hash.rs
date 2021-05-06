@@ -8,18 +8,18 @@ lazy_static! {
 
 #[derive(Debug, Clone, Copy)]
 struct RandomNumberGenerator {
-    a: Wrapping<i64>,
-    b: Wrapping<i64>,
-    c: Wrapping<i64>,
-    d: Wrapping<i64>,
+    a: Wrapping<u64>,
+    b: Wrapping<u64>,
+    c: Wrapping<u64>,
+    d: Wrapping<u64>,
 }
 
-fn rot(x: i64, k: u8) -> i64 {
+fn rot(x: u64, k: u8) -> u64 {
     (x << k) | (x >> (64 - k))
 }
 
 impl RandomNumberGenerator {
-    fn new(seed: i64) -> RandomNumberGenerator {
+    fn new(seed: u64) -> RandomNumberGenerator {
         let mut rng = RandomNumberGenerator {
             a: Wrapping(0xf1ea5eed),
             b: Wrapping(seed),
@@ -33,7 +33,7 @@ impl RandomNumberGenerator {
         rng
     }
 
-    fn next_value(&mut self) -> i64 {
+    fn next_value(&mut self) -> u64 {
         let e = self.a - Wrapping(rot(self.b.0, 7));
         self.a = self.b ^ Wrapping(rot(self.c.0, 13));
         self.b = self.c + Wrapping(rot(self.d.0, 37));
@@ -44,7 +44,7 @@ impl RandomNumberGenerator {
 }
 
 pub struct ChessHasher {
-    random_numbers: [i64; 781],
+    random_numbers: [u64; 781],
     corners: [Bitboard; 4],
 }
 
@@ -67,7 +67,7 @@ impl ChessHasher {
         }
     }
 
-    fn get_piece_hash(&self, square: Square, piece: Piece) -> i64 {
+    fn get_piece_hash(&self, square: Square, piece: Piece) -> u64 {
         // 64 squares
         let s = usize::from(square);
         // 6 roles
@@ -80,7 +80,7 @@ impl ChessHasher {
     }
 
     // Color to move [768]
-    fn get_color_hash(&self, color: Color) -> i64 {
+    fn get_color_hash(&self, color: Color) -> u64 {
         if color == Color::Black {
             self.random_numbers[768]
         } else {
@@ -89,7 +89,7 @@ impl ChessHasher {
     }
 
     // Castling Rights [769, 770, 771, 772]
-    fn get_castling_hash(&self, rights: Bitboard) -> i64 {
+    fn get_castling_hash(&self, rights: Bitboard) -> u64 {
         let mut hash = 0;
         for (i, corner) in self.corners.iter().enumerate() {
             if rights & *corner == *corner {
@@ -100,14 +100,14 @@ impl ChessHasher {
     }
 
     // En passant file [773, 774, 775, 776, 777, 778, 779, 780]
-    fn get_en_passant_hash(&self, ep_square: Option<Square>) -> i64 {
+    fn get_en_passant_hash(&self, ep_square: Option<Square>) -> u64 {
         match ep_square {
             Option::None => 0,
             Option::Some(square) => self.random_numbers[usize::from(square.file()) + 773],
         }
     }
 
-    pub fn hash(&self, game: &Chess) -> i64 {
+    pub fn hash(&self, game: &Chess) -> u64 {
         let mut hash = 0;
         for (square, piece) in game.board().pieces() {
             hash ^= self.get_piece_hash(square, piece);
@@ -120,11 +120,11 @@ impl ChessHasher {
 
     pub fn update_hash(
         &self,
-        original_hash: i64,
+        original_hash: u64,
         original_game: &Chess,
         new_game: &Chess,
         chess_move: &Move,
-    ) -> i64 {
+    ) -> u64 {
         let mut new_hash = original_hash;
         let color = original_game.turn();
         let opp_color = new_game.turn();

@@ -6,78 +6,7 @@ use std::cmp::Ordering;
 
 use crate::eval::Evaluation;
 use crate::game::Game;
-
-const CACHE_SIZE_U64: u64 = 16777216;
-const CACHE_SIZE: usize = CACHE_SIZE_U64 as usize;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CachedEvaluation {
-    Empty,
-    Exact(u64, usize, i16),
-    LowerBound(u64, usize, i16),
-    UpperBound(u64, usize, i16),
-}
-
-impl CachedEvaluation {
-    fn hash(&self) -> u64 {
-        match *self {
-            Self::Exact(hash, _, _) => hash,
-            Self::LowerBound(hash, _, _) => hash,
-            Self::UpperBound(hash, _, _) => hash,
-            _ => 0,
-        }
-    }
-
-    fn depth(&self) -> usize {
-        match *self {
-            Self::Exact(_, depth, _) => depth,
-            Self::LowerBound(_, depth, _) => depth,
-            Self::UpperBound(_, depth, _) => depth,
-            _ => 0,
-        }
-    }
-
-    fn value(&self) -> i16 {
-        match *self {
-            Self::Exact(_, _, value) => value,
-            Self::LowerBound(_, _, value) => value,
-            Self::UpperBound(_, _, value) => value,
-            _ => Evaluation::ZERO,
-        }
-    }
-}
-
-struct Evaluator {
-    cache: RefCell<Vec<CachedEvaluation>>,
-}
-
-impl Default for Evaluator {
-    fn default() -> Self {
-        Self {
-            cache: RefCell::new(vec![CachedEvaluation::Empty; CACHE_SIZE]),
-        }
-    }
-}
-
-impl Evaluator {
-    fn get_evaluation(&self, game: &Game) -> CachedEvaluation {
-        match self.cache.borrow()[(game.hash() % CACHE_SIZE_U64) as usize] {
-            CachedEvaluation::Empty => CachedEvaluation::Empty,
-            val => {
-                if val.hash() == game.hash() {
-                    val
-                } else {
-                    CachedEvaluation::Empty
-                }
-            }
-        }
-    }
-
-    fn update_evaluation(&self, game: &Game, cached_eval: CachedEvaluation) {
-        let mut cache = self.cache.borrow_mut();
-        cache[(game.hash() as usize) & (CACHE_SIZE - 1)] = cached_eval;
-    }
-}
+use crate::tt::*;
 
 struct Node {
     hash: u64,
@@ -140,7 +69,7 @@ impl Node {
     }
 
     fn is_expanded(&self) -> bool {
-        self.children.len() > 0
+        !self.children.is_empty()
     }
 
     fn expand(&mut self, game: &Game) {
@@ -183,7 +112,7 @@ impl Node {
 
 pub struct NaiveChessAgent {
     depth: usize,
-    evaluator: Evaluator,
+    evaluator: TranspositionTable,
     head: RefCell<Node>,
 }
 
@@ -191,7 +120,7 @@ impl NaiveChessAgent {
     pub fn new(depth: usize) -> Self {
         Self {
             depth,
-            evaluator: Evaluator::default(),
+            evaluator: TranspositionTable::default(),
             head: RefCell::new(Node::default()),
         }
     }
@@ -209,7 +138,7 @@ impl NaiveChessAgent {
         }
         if !updated {
             self.head = RefCell::new(Node::new(game.clone()));
-            self.evaluator = Evaluator::default();
+            self.evaluator = TranspositionTable::default();
         }
     }
 
@@ -222,17 +151,17 @@ impl NaiveChessAgent {
         beta: &mut i16,
     ) -> Option<i16> {
         match self.evaluator.get_evaluation(game) {
-            CachedEvaluation::Empty => None,
+            CachedValue::Empty => None,
             cached_eval => {
                 if cached_eval.depth() >= depth {
                     *value = cached_eval.value();
                     match cached_eval {
-                        CachedEvaluation::Exact(_, _, evaluation) => Some(evaluation),
-                        CachedEvaluation::LowerBound(_, _, evaluation) => {
+                        CachedValue::Exact(_, _, evaluation) => Some(evaluation),
+                        CachedValue::Alpha(_, _, evaluation) => {
                             *alpha = cmp::max(*alpha, evaluation);
                             None
                         }
-                        CachedEvaluation::UpperBound(_, _, evaluation) => {
+                        CachedValue::Beta(_, _, evaluation) => {
                             *beta = cmp::max(*beta, evaluation);
                             None
                         }
@@ -292,7 +221,7 @@ impl NaiveChessAgent {
         } else if depth == 0 {
             let value = self.q_search(game, alpha, beta);
             self.evaluator
-                .update_evaluation(game, CachedEvaluation::Exact(game.hash(), depth, value));
+                .update_evaluation(game, CachedValue::Exact(game.hash(), depth, value));
             value
         } else {
             for child_node in node.children.iter_mut() {
@@ -313,11 +242,11 @@ impl NaiveChessAgent {
             }
             node.sort_children_by_evaluation();
             let cached_eval = if value <= alpha_orig {
-                CachedEvaluation::UpperBound(game.hash(), depth, value)
+                CachedValue::Beta(game.hash(), depth, value)
             } else if value >= beta {
-                CachedEvaluation::LowerBound(game.hash(), depth, value)
+                CachedValue::Alpha(game.hash(), depth, value)
             } else {
-                CachedEvaluation::Exact(game.hash(), depth, value)
+                CachedValue::Exact(game.hash(), depth, value)
             };
             self.evaluator.update_evaluation(&game, cached_eval);
             value

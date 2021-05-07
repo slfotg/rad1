@@ -52,8 +52,8 @@ impl ChessHasher {
     pub fn default() -> Self {
         let mut rng = RandomNumberGenerator::new(101);
         let mut random_numbers = [0; 781];
-        for i in 0..781 {
-            random_numbers[i] = rng.next_value();
+        for num in &mut random_numbers {
+            *num = rng.next_value();
         }
         let corners: [Bitboard; 4] = [
             Bitboard::from_square(Square::A1),

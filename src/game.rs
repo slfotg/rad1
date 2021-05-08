@@ -1,4 +1,4 @@
-use shakmaty::{Chess, Move, MoveList, Position};
+use shakmaty::*;
 use std::cmp::Ordering;
 
 use crate::hash::CHESS_HASHER;
@@ -11,15 +11,18 @@ pub struct Game {
 
 impl Default for Game {
     fn default() -> Self {
-        let position = Chess::default();
-        let hash = CHESS_HASHER.hash(&position);
-        Self { position, hash }
+        Self::from_position(Chess::default())
     }
 }
 
 impl Game {
     pub fn new(position: Chess, hash: u64) -> Self {
         Self { position, hash }
+    }
+
+    pub fn from_position(position: Chess) -> Self {
+        let hash = CHESS_HASHER.hash(&position);
+        Self::new(position, hash)
     }
 
     #[inline]
@@ -79,5 +82,10 @@ impl Game {
         let mut captures = self.captures();
         captures.sort_by(Self::compare_moves);
         captures
+    }
+
+    pub fn swap_turn(&self) -> Result<Game, PositionError<Chess>> {
+        let null_position = self.position.clone().swap_turn()?;
+        Ok(Self::from_position(null_position))
     }
 }

@@ -6,7 +6,7 @@ use shakmaty::*;
 fn main() {
     let mut chess_game = Game::default();
     let mut player1 = agent::command_line_agent();
-    let mut player2 = agent::naive_chess_agent(6);
+    let mut player2 = agent::naive_chess_agent(8);
     let mut current_player = Color::White;
     print_game(&chess_game.position);
     while !chess_game.position.is_game_over() {

@@ -196,6 +196,26 @@ impl NaiveChessAgent {
         }
     }
 
+    // this is really just a pure alpha beta search
+    // with no caching or storing evaluations in nodes
+    // used for the null move heursitic
+    fn null_alpha_beta(game: &Game, depth: usize, mut alpha: i16, beta: i16) -> i16 {
+        if depth == 0 {
+            Evaluation::evaluate(game)
+        } else {
+            for child_move in game.sorted_moves().iter() {
+                let val = -Self::null_alpha_beta(&game.play(child_move), depth - 1, -beta, -alpha);
+                if val >= beta {
+                    return beta;
+                }
+                if val > alpha {
+                    alpha = val;
+                }
+            }
+            alpha
+        }
+    }
+
     fn alpha_beta(
         &self,
         game: &Game,
@@ -224,6 +244,15 @@ impl NaiveChessAgent {
                 .update_evaluation(game, CachedValue::Exact(game.hash(), depth, value));
             value
         } else {
+            if depth >= 3 {
+                if let Ok(null_move) = game.swap_turn() {
+                    let score = -Self::null_alpha_beta(&null_move, depth - 3, -beta, -beta + 1);
+                    if score >= beta {
+                        node.evaluation = Some(beta);
+                        return beta;
+                    }
+                }
+            }
             for child_node in node.children.iter_mut() {
                 let child_move = child_node.chess_move.clone();
 

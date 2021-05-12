@@ -2,6 +2,7 @@ use shakmaty::Move;
 
 use crate::game::Game;
 
+mod ab;
 mod naive;
 mod random;
 mod uci;
@@ -20,4 +21,8 @@ pub fn command_line_agent() -> impl ChessAgent {
 
 pub fn naive_chess_agent(depth: usize) -> impl ChessAgent {
     naive::NaiveChessAgent::new(depth)
+}
+
+pub fn alpha_beta_agent(depth: usize) -> impl ChessAgent {
+    ab::AlphaBetaChessAgent::new(depth)
 }

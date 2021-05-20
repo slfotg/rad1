@@ -7,6 +7,7 @@ use crate::hash::CHESS_HASHER;
 pub struct Game {
     pub position: Chess,
     pub hash: u64,
+    pub history: Vec<u64>,
 }
 
 impl Default for Game {
@@ -17,7 +18,9 @@ impl Default for Game {
 
 impl Game {
     pub fn new(position: Chess, hash: u64) -> Self {
-        Self { position, hash }
+        let mut history = Vec::with_capacity(200);
+        history.push(hash);
+        Self { position, hash, history }
     }
 
     pub fn from_position(position: Chess) -> Self {
@@ -37,6 +40,7 @@ impl Game {
             CHESS_HASHER.update_hash(self.hash, &self.position, &next_position, chess_move);
         self.position = next_position;
         self.hash = next_hash;
+        self.history.push(next_hash);
     }
 
     pub fn play(&self, chess_move: &Move) -> Self {

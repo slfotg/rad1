@@ -1,12 +1,56 @@
+use clap::{App, AppSettings, Arg, SubCommand};
 use rad1::agent;
 use rad1::agent::ChessAgent;
 use rad1::game::Game;
+use shakmaty::fen::Fen;
 use shakmaty::*;
 
 fn main() {
+    let matches = App::new("Rad1 Chess Engine")
+        .setting(AppSettings::SubcommandRequired)
+        .version("0.1.0")
+        .author("Sam Foster <slfotg@gmail.com>")
+        .about("Simple Chess Engine in Rust")
+        .subcommand(
+            SubCommand::with_name("play")
+                .about("Play against the chess engine from terminal")
+        )
+        .subcommand(
+            SubCommand::with_name("analyze")
+                .about("Analyze a single position")
+                .arg(
+                    Arg::with_name("fen")
+                        .long("fen")
+                        .short("f")
+                        .required(true)
+                        .takes_value(true)
+                        .help("The Forsyth-Edwards Notation (FEN) of the position to be analyzed"),
+                ),
+        )
+        .get_matches();
+    println!("{}", matches.subcommand_name().unwrap());
+    if let Some(matches) = matches.subcommand_matches("analyze") {
+        let fen = matches.value_of("fen").unwrap();
+        let setup: Fen = fen.parse().expect("Failed to parse FEN");
+        let position: Chess = setup
+            .position(CastlingMode::Standard)
+            .expect("Failed to setup position from FEN");
+        let chess_game = Game::from_position(position);
+        analyze_position(&chess_game);
+    } else {
+        play_game();
+    }
+}
+
+fn analyze_position(chess_game: &Game) {
+    let mut agent = agent::alpha_beta_agent(8);
+    agent.best_move(chess_game);
+}
+
+fn play_game() {
     let mut chess_game = Game::default();
     let mut player1 = agent::command_line_agent();
-    let mut player2 = agent::alpha_beta_agent(8);
+    let mut player2 = agent::alpha_beta_agent(3);
     let mut current_player = Color::White;
     print_game(&chess_game.position);
     while !chess_game.position.is_game_over() {

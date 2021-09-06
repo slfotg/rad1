@@ -1,4 +1,5 @@
 use super::ChessAgent;
+use shakmaty::san::San;
 use shakmaty::{Move, Position};
 use std::cmp;
 use std::cmp::Ordering;
@@ -182,8 +183,7 @@ impl Node {
             Evaluation::evaluate(game)
         } else if depth == 0 {
             let value = q_search(game, alpha, beta);
-            trans_table
-                .update_evaluation(game, CachedValue::Exact(game.hash(), depth, value));
+            trans_table.update_evaluation(game, CachedValue::Exact(game.hash(), depth, value));
             value
         } else {
             if depth >= 3 {
@@ -264,18 +264,12 @@ impl ChessAgent for AlphaBetaChessAgent {
         let beta = Evaluation::MAX;
         let mut head = self.head.take().unwrap();
         for i in 1..=self.depth {
-            head.alpha_beta(
-                &self.evaluator,
-                &game,
-                i,
-                alpha,
-                beta,
-            );
+            head.alpha_beta(&self.evaluator, &game, i, alpha, beta);
             println!(
                 "{} - {} = {:?}",
                 i,
-                head.best_move().unwrap(),
-                head.evaluation,
+                San::from_move(&game.position, &head.best_move().unwrap()).to_string(),
+                head.evaluation.unwrap(),
             );
         }
 
@@ -286,7 +280,10 @@ impl ChessAgent for AlphaBetaChessAgent {
         let first_child = head.first_child();
         self.head = Some(first_child);
 
-        println!("Best move: {}", best_move);
+        println!(
+            "Best move: {}",
+            San::from_move(&game.position, &best_move).to_string()
+        );
         println!("Size: {}", self.size());
         best_move
     }

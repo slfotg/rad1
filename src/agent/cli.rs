@@ -5,15 +5,15 @@ use std::io;
 
 use crate::game::Game;
 
-pub struct UciAgent {}
+pub struct CommandLineAgent {}
 
-impl Default for UciAgent {
+impl Default for CommandLineAgent {
     fn default() -> Self {
         Self {}
     }
 }
 
-impl ChessAgent for UciAgent {
+impl ChessAgent for CommandLineAgent {
     fn best_move(&mut self, game: &Game) -> Move {
         let chess_move: Move;
         loop {

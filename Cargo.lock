@@ -137,6 +137,7 @@ dependencies = [
 name = "rad1"
 version = "0.1.0"
 dependencies = [
+ "ansi_term",
  "clap",
  "lazy_static",
  "rand",

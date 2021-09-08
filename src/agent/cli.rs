@@ -17,7 +17,8 @@ impl ChessAgent for CommandLineAgent {
     fn best_move(&mut self, game: &Game) -> Move {
         let chess_move: Move;
         loop {
-            println!("Please enter move (UCI notation)");
+            println!("Please enter move (Long algebraic notation)");
+            println!("Examples:  e2e4, e7e5, e1g1 (white short castling), e7e8q (for promotion)");
             let mut uci_move = String::new();
             io::stdin()
                 .read_line(&mut uci_move)
@@ -30,7 +31,7 @@ impl ChessAgent for CommandLineAgent {
                     }
                     Err(_illegal_move) => println!("Illegal Move for current position"),
                 },
-                Err(_uci_error) => println!("Failed to parse UCI string"),
+                Err(_uci_error) => println!("Failed to parse move format"),
             }
         }
         chess_move

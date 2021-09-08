@@ -1,3 +1,5 @@
+use ansi_term::Colour;
+use ansi_term::Style;
 use clap::{App, AppSettings, Arg, SubCommand};
 use rad1::agent;
 use rad1::agent::ChessAgent;
@@ -10,10 +12,9 @@ fn main() {
         .setting(AppSettings::SubcommandRequired)
         .version("0.1.0")
         .author("Sam Foster <slfotg@gmail.com>")
-        .about("Simple Chess Engine in Rust")
+        .about("A Simple Chess Engine in Rust")
         .subcommand(
-            SubCommand::with_name("play")
-                .about("Play against the chess engine from terminal")
+            SubCommand::with_name("play").about("Play against the chess engine from terminal"),
         )
         .subcommand(
             SubCommand::with_name("analyze")
@@ -28,7 +29,7 @@ fn main() {
                 ),
         )
         .get_matches();
-    println!("{}", matches.subcommand_name().unwrap());
+
     if let Some(matches) = matches.subcommand_matches("analyze") {
         let fen = matches.value_of("fen").unwrap();
         let setup: Fen = fen.parse().expect("Failed to parse FEN");
@@ -66,30 +67,33 @@ fn play_game() {
 }
 
 fn print_game(game: &Chess) {
-    const ITALIC: &str = "\u{001b}[3m";
-    const FG_BLACK: &str = "\u{001b}[38;5;16m";
-    const BG_BLACK: &str = "\u{001b}[48;5;34m";
-    const BG_WHITE: &str = "\u{001b}[48;5;220m";
-    const RESET: &str = "\u{001b}[0m";
+    #[cfg(target_os = "windows")]
+    ansi_term::enable_ansi_support();
+
+    let italic: Style = Style::new().italic();
+    let fg_black: Colour = Colour::Fixed(16);
+    let bg_black: Style = fg_black.on(Colour::Fixed(34));
+    let bg_white: Style = fg_black.on(Colour::Fixed(220));
     let board = game.board();
     for rank in (0..8).rev() {
-        let mut background = if rank % 2 == 1 { BG_WHITE } else { BG_BLACK };
-        print!("{} {} {}{}", ITALIC, rank + 1, RESET, FG_BLACK);
+        let mut line: String = String::from("");
+        let mut background = if rank % 2 == 1 { bg_white } else { bg_black };
+        line.push_str(&italic.paint(format!(" {} ", rank + 1)).to_string());
         for file in 0..8 {
             let square = Square::new(rank * 8 + file);
             let piece_char = board
                 .piece_at(square)
                 .map_or(" ", |piece| get_piece_char(piece));
-            print!("{} {} ", background, piece_char);
-            background = if background == BG_WHITE {
-                BG_BLACK
+            line.push_str(&background.paint(format!(" {} ", piece_char)).to_string());
+            background = if background == bg_white {
+                bg_black
             } else {
-                BG_WHITE
+                bg_white
             };
         }
-        println!("{}", RESET);
+        println!("{}", line);
     }
-    println!("{}    A  B  C  D  E  F  G  H{}", ITALIC, RESET);
+    println!("{}", italic.paint("    A  B  C  D  E  F  G  H"));
 }
 
 fn get_piece_char(piece: Piece) -> &'static str {

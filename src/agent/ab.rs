@@ -106,7 +106,7 @@ impl Node {
         Self {
             hash: game.hash(),
             evaluation: None,
-            chess_move: chess_move,
+            chess_move,
             children: vec![],
         }
     }

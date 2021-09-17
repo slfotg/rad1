@@ -49,7 +49,6 @@ impl<'a, 'b> Command<'a, 'b> for PlayCommand {
     }
 
     fn exec_with_depth(&self, depth: usize, matches: &ArgMatches) {
-
         let start_position = matches.value_of("start-position").unwrap();
         let setup: Fen = start_position.parse().expect("Failed to parse FEN");
         let position: Chess = setup
@@ -61,18 +60,23 @@ impl<'a, 'b> Command<'a, 'b> for PlayCommand {
         if color == "White" {
             let mut white_player = agent::command_line_agent();
             let mut black_player = agent::alpha_beta_agent(depth);
-            play_game(&mut chess_game, &mut white_player, &mut black_player);
+            play_game(&mut chess_game, &mut white_player, &mut black_player, false);
         } else {
             let mut white_player = agent::alpha_beta_agent(depth);
             let mut black_player = agent::command_line_agent();
-            play_game(&mut chess_game, &mut white_player, &mut black_player);
+            play_game(&mut chess_game, &mut white_player, &mut black_player, true);
         }
     }
 }
 
-fn play_game(chess_game: &mut Game, white_player: &mut dyn ChessAgent, black_player: &mut dyn ChessAgent) {
+fn play_game(
+    chess_game: &mut Game,
+    white_player: &mut dyn ChessAgent,
+    black_player: &mut dyn ChessAgent,
+    reverse_board: bool,
+) {
     let mut current_player = chess_game.position.turn();
-    print_game(&chess_game.position);
+    print_game(&chess_game.position, reverse_board);
     while !chess_game.position.is_game_over() {
         let best_move = match current_player {
             Color::White => white_player.best_move(&chess_game),
@@ -80,12 +84,12 @@ fn play_game(chess_game: &mut Game, white_player: &mut dyn ChessAgent, black_pla
         };
         chess_game.play_mut(&best_move);
         current_player = !current_player;
-        print_game(&chess_game.position);
+        print_game(&chess_game.position, reverse_board);
     }
     println!("{:?}", chess_game.position.outcome());
 }
 
-fn print_game(game: &Chess) {
+fn print_game(game: &Chess, reverse_board: bool) {
     #[cfg(target_os = "windows")]
     ansi_term::enable_ansi_support();
 
@@ -94,25 +98,35 @@ fn print_game(game: &Chess) {
     let bg_black: Style = fg_black.on(Colour::Fixed(34));
     let bg_white: Style = fg_black.on(Colour::Fixed(220));
     let board = game.board();
-    for rank in (0..8).rev() {
-        let mut line: String = String::new();
-        let mut background = if rank % 2 == 1 { bg_white } else { bg_black };
-        line.push_str(&italic.paint(format!(" {} ", rank + 1)).to_string());
-        for file in 0..8 {
-            let square = Square::new(rank * 8 + file);
-            let piece_char = board
-                .piece_at(square)
-                .map_or(" ", |piece| get_piece_char(piece));
-            line.push_str(&background.paint(format!(" {} ", piece_char)).to_string());
-            background = if background == bg_white {
-                bg_black
-            } else {
-                bg_white
-            };
+    if reverse_board {
+        for rank in 0..8 {
+            print_rank(rank, &italic, &bg_black, &bg_white, board);
         }
-        println!("{}", line);
+    } else {
+        for rank in (0..8).rev() {
+            print_rank(rank, &italic, &bg_black, &bg_white, board);
+        }
     }
     println!("{}", italic.paint("    A  B  C  D  E  F  G  H"));
+}
+
+fn print_rank(rank: u32, italic: &Style, bg_black: &Style, bg_white: &Style, board: &Board) {
+    let mut line: String = String::new();
+    let mut background = if rank % 2 == 1 { bg_white } else { bg_black };
+    line.push_str(&italic.paint(format!(" {} ", rank + 1)).to_string());
+    for file in 0..8 {
+        let square = Square::new(rank * 8 + file);
+        let piece_char = board
+            .piece_at(square)
+            .map_or(" ", |piece| get_piece_char(piece));
+        line.push_str(&background.paint(format!(" {} ", piece_char)).to_string());
+        background = if background == bg_white {
+            bg_black
+        } else {
+            bg_white
+        };
+    }
+    println!("{}", line);
 }
 
 fn get_piece_char(piece: Piece) -> &'static str {

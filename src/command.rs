@@ -1,8 +1,8 @@
 
 use clap::{App, ArgMatches};
 
-pub mod analyze;
-pub mod play;
+mod analyze;
+mod play;
 
 pub trait Command<'a, 'b> {
 

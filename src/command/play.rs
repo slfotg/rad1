@@ -2,6 +2,7 @@ use super::Command;
 use ansi_term::Colour;
 use ansi_term::Style;
 use clap::{App, Arg, ArgMatches, SubCommand};
+use itertools::Either;
 use shakmaty::fen::Fen;
 use shakmaty::*;
 
@@ -98,14 +99,13 @@ fn print_game(game: &Chess, reverse_board: bool) {
     let bg_black: Style = fg_black.on(Colour::Fixed(34));
     let bg_white: Style = fg_black.on(Colour::Fixed(220));
     let board = game.board();
-    if reverse_board {
-        for rank in 0..8 {
-            print_rank(rank, &italic, &bg_black, &bg_white, board);
-        }
+    let range = if reverse_board {
+        Either::Left(0..8)
     } else {
-        for rank in (0..8).rev() {
-            print_rank(rank, &italic, &bg_black, &bg_white, board);
-        }
+        Either::Right((0..8).rev())
+    };
+    for rank in range {
+        print_rank(rank, &italic, &bg_black, &bg_white, board);
     }
     println!("{}", italic.paint("    A  B  C  D  E  F  G  H"));
 }

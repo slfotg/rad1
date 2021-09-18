@@ -1,6 +1,5 @@
-use shakmaty::*;
-
 use crate::game::Game;
+use chess::{Color, Piece, Square};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Evaluation {}
@@ -11,9 +10,9 @@ impl Evaluation {
     pub const MIN: i16 = i16::MIN + 1; // -32767
     pub const MAX: i16 = i16::MAX; //  32767
     pub const ZERO: i16 = 0;
-    const PIECE_VALUES: [i16; 7] = [0, 10, 30, 30, 50, 90, 0];
-    const PIECE_FACTORS: [i16; 7] = [0, 1, 1, 1, 1, 1, 0];
-    const COLOR_FACTORS: [i16; 2] = [-1, 1];
+    const PIECE_VALUES: [i16; 6] = [10, 30, 30, 50, 90, 0];
+    const PIECE_FACTORS: [i16; 6] = [1, 1, 1, 1, 1, 0];
+    const COLOR_FACTORS: [i16; 2] = [1, -1];
     #[rustfmt::skip]
     const SQUARE_VALUES: [i16; 64] = [
         1, 1, 1, 1, 1, 1, 1, 1,
@@ -27,13 +26,13 @@ impl Evaluation {
     ];
 
     #[inline]
-    fn piece_value(piece: &Piece) -> i16 {
-        Self::PIECE_VALUES[piece.role as usize]
+    fn piece_value(piece: Piece) -> i16 {
+        Self::PIECE_VALUES[piece.to_index()]
     }
 
     #[inline]
-    fn position_value(square: &Square, piece: &Piece) -> i16 {
-        Self::PIECE_FACTORS[piece.role as usize] * Self::SQUARE_VALUES[*square as usize]
+    fn position_value(square: Square, piece: Piece) -> i16 {
+        Self::PIECE_FACTORS[piece.to_index()] * Self::SQUARE_VALUES[square.to_index()]
     }
 
     #[inline]
@@ -66,7 +65,6 @@ impl Evaluation {
 mod tests {
     use super::Evaluation;
     use crate::game::Game;
-    use shakmaty::*;
 
     #[test]
     fn initial_board_eval() {

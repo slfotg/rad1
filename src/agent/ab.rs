@@ -2,6 +2,7 @@ use super::ChessAgent;
 use crate::eval::Evaluation;
 use crate::game::Game;
 use crate::tt::*;
+use chess::ChessMove;
 use std::cmp;
 use std::cmp::Ordering;
 
@@ -36,7 +37,7 @@ fn null_alpha_beta(game: &Game, depth: usize, mut alpha: i16, beta: i16) -> i16 
         Evaluation::evaluate(game)
     } else {
         for child_move in game.sorted_moves() {
-            let val = -null_alpha_beta(&game.play(&child_move), depth - 1, -beta, -alpha);
+            let val = -null_alpha_beta(&game.play(child_move), depth - 1, -beta, -alpha);
             if val >= beta {
                 return beta;
             }
@@ -83,7 +84,7 @@ fn cached_evaluation(
 struct Node {
     hash: u64,
     evaluation: Option<i16>,
-    chess_move: Option<Move>,
+    chess_move: Option<ChessMove>,
     children: Vec<Node>,
 }
 
@@ -99,7 +100,7 @@ impl Default for Node {
 }
 
 impl Node {
-    fn new(game: Game, chess_move: Option<Move>) -> Self {
+    fn new(game: Game, chess_move: Option<ChessMove>) -> Self {
         Self {
             hash: game.hash(),
             evaluation: None,
@@ -108,7 +109,7 @@ impl Node {
         }
     }
 
-    fn best_move(&self) -> Option<Move> {
+    fn best_move(&self) -> Option<ChessMove> {
         self.children[0].chess_move.clone()
     }
 
@@ -133,7 +134,7 @@ impl Node {
         if !self.is_expanded() {
             let moves = game.sorted_moves();
             for m in moves.into_iter() {
-                self.children.push(Node::new(game.play(&m), Some(m)));
+                self.children.push(Node::new(game.play(m), Some(m)));
             }
         }
     }

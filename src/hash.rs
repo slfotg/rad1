@@ -1,5 +1,5 @@
+use chess::{BitBoard, Color, File, Piece, Rank, Square};
 use lazy_static::lazy_static;
-use shakmaty::*;
 use std::num::Wrapping;
 
 lazy_static! {
@@ -45,7 +45,7 @@ impl RandomNumberGenerator {
 
 pub struct ChessHasher {
     random_numbers: [u64; 781],
-    corners: [Bitboard; 4],
+    corners: [BitBoard; 4],
 }
 
 impl ChessHasher {
@@ -55,11 +55,11 @@ impl ChessHasher {
         for num in &mut random_numbers {
             *num = rng.next_value();
         }
-        let corners: [Bitboard; 4] = [
-            Bitboard::from_square(Square::A1),
-            Bitboard::from_square(Square::A8),
-            Bitboard::from_square(Square::H1),
-            Bitboard::from_square(Square::H8),
+        let corners: [BitBoard; 4] = [
+            BitBoard::from_square(Square::make_square(Rank::First, File::A)),
+            BitBoard::from_square(Square::make_square(Rank::Eighth, File::A)),
+            BitBoard::from_square(Square::make_square(Rank::First, File::H)),
+            BitBoard::from_square(Square::make_square(Rank::Eighth, File::H)),
         ];
         Self {
             random_numbers,
@@ -67,13 +67,13 @@ impl ChessHasher {
         }
     }
 
-    fn get_piece_hash(&self, square: Square, piece: Piece) -> u64 {
+    fn get_piece_hash(&self, square: Square, piece: Piece, color: Color) -> u64 {
         // 64 squares
-        let s = usize::from(square);
-        // 6 roles
-        let r = usize::from(piece.role) - 1;
+        let s = square.to_index();
+        // 6 pieces
+        let r = piece.to_index();
         // 2 colors
-        let c = if piece.color == Color::Black { 0 } else { 1 };
+        let c = color.to_index();
 
         let index = c * 384 + r * 64 + s;
         self.random_numbers[index]
@@ -89,7 +89,7 @@ impl ChessHasher {
     }
 
     // Castling Rights [769, 770, 771, 772]
-    fn get_castling_hash(&self, rights: Bitboard) -> u64 {
+    fn get_castling_hash(&self, rights: BitBoard) -> u64 {
         let mut hash = 0;
         for (i, corner) in self.corners.iter().enumerate() {
             if rights & *corner == *corner {

@@ -1,14 +1,13 @@
 use super::Command;
-use ansi_term::Colour;
-use ansi_term::Style;
-use clap::{App, Arg, ArgMatches, SubCommand};
-use itertools::Either;
-use shakmaty::fen::Fen;
-use shakmaty::*;
-
 use crate::agent;
 use crate::agent::ChessAgent;
 use crate::game::Game;
+use ansi_term::Colour;
+use ansi_term::Style;
+use chess::{Board, BoardStatus, Color, File, Piece, Rank, Square};
+use clap::{App, Arg, ArgMatches, SubCommand};
+use itertools::Either;
+use std::str::FromStr;
 
 const COMMAND_NAME: &str = "play";
 
@@ -51,10 +50,8 @@ impl<'a, 'b> Command<'a, 'b> for PlayCommand {
 
     fn exec_with_depth(&self, depth: usize, matches: &ArgMatches) {
         let start_position = matches.value_of("start-position").unwrap();
-        let setup: Fen = start_position.parse().expect("Failed to parse FEN");
-        let position: Chess = setup
-            .position(CastlingMode::Standard)
-            .expect("Failed to setup position from FEN");
+        let position = Board::from_str(start_position).expect("Failed to parse FEN");
+        let chess_game = Game::from_position(position);
         let mut chess_game = Game::from_position(position);
         let color = matches.value_of("color").unwrap();
 
@@ -76,21 +73,21 @@ fn play_game(
     black_player: &mut dyn ChessAgent,
     reverse_board: bool,
 ) {
-    let mut current_player = chess_game.position.turn();
-    print_game(&chess_game.position, reverse_board);
-    while !chess_game.position.is_game_over() {
+    let mut current_player = chess_game.position.side_to_move();
+    print_board(&chess_game.position, reverse_board);
+    while chess_game.position.status() == BoardStatus::Ongoing {
         let best_move = match current_player {
             Color::White => white_player.best_move(&chess_game),
             Color::Black => black_player.best_move(&chess_game),
         };
         chess_game.play_mut(&best_move);
         current_player = !current_player;
-        print_game(&chess_game.position, reverse_board);
+        print_board(&chess_game.position, reverse_board);
     }
-    println!("{:?}", chess_game.position.outcome());
+    println!("{:?}", chess_game.position.status());
 }
 
-fn print_game(game: &Chess, reverse_board: bool) {
+fn print_board(board: &Board, reverse_board: bool) {
     #[cfg(target_os = "windows")]
     ansi_term::enable_ansi_support();
 
@@ -98,7 +95,6 @@ fn print_game(game: &Chess, reverse_board: bool) {
     let fg_black: Colour = Colour::Fixed(16);
     let bg_black: Style = fg_black.on(Colour::Fixed(34));
     let bg_white: Style = fg_black.on(Colour::Fixed(220));
-    let board = game.board();
     let range = if reverse_board {
         Either::Left(0..8)
     } else {
@@ -129,19 +125,19 @@ fn print_rank(rank: u32, italic: &Style, bg_black: &Style, bg_white: &Style, boa
     println!("{}", line);
 }
 
-fn get_piece_char(piece: Piece) -> &'static str {
-    match (piece.color, piece.role) {
-        (Color::White, Role::Pawn) => "♙",
-        (Color::White, Role::Knight) => "♘",
-        (Color::White, Role::Bishop) => "♗",
-        (Color::White, Role::Rook) => "♖",
-        (Color::White, Role::Queen) => "♕",
-        (Color::White, Role::King) => "♔",
-        (Color::Black, Role::Pawn) => "♟︎",
-        (Color::Black, Role::Knight) => "♞",
-        (Color::Black, Role::Bishop) => "♝",
-        (Color::Black, Role::Rook) => "♜",
-        (Color::Black, Role::Queen) => "♛",
-        (Color::Black, Role::King) => "♚",
+fn get_piece_char(color: Color, piece: Piece) -> &'static str {
+    match (color, piece) {
+        (Color::White, Piece::Pawn) => "♙",
+        (Color::White, Piece::Knight) => "♘",
+        (Color::White, Piece::Bishop) => "♗",
+        (Color::White, Piece::Rook) => "♖",
+        (Color::White, Piece::Queen) => "♕",
+        (Color::White, Piece::King) => "♔",
+        (Color::Black, Piece::Pawn) => "♟︎",
+        (Color::Black, Piece::Knight) => "♞",
+        (Color::Black, Piece::Bishop) => "♝",
+        (Color::Black, Piece::Rook) => "♜",
+        (Color::Black, Piece::Queen) => "♛",
+        (Color::Black, Piece::King) => "♚",
     }
 }

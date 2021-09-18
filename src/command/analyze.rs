@@ -1,11 +1,10 @@
 use super::Command;
-use clap::{App, Arg, ArgMatches, SubCommand};
-use shakmaty::fen::Fen;
-use shakmaty::*;
-
 use crate::agent;
 use crate::agent::ChessAgent;
 use crate::game::Game;
+use chess::Board;
+use clap::{App, Arg, ArgMatches, SubCommand};
+use std::str::FromStr;
 
 const COMMAND_NAME: &str = "analyze";
 
@@ -37,10 +36,7 @@ impl<'a, 'b> Command<'a, 'b> for AnalyzeCommand {
 
     fn exec_with_depth(&self, depth: usize, matches: &ArgMatches) {
         let fen = matches.value_of("fen").unwrap();
-        let setup: Fen = fen.parse().expect("Failed to parse FEN");
-        let position: Chess = setup
-            .position(CastlingMode::Standard)
-            .expect("Failed to setup position from FEN");
+        let position = Board::from_str(fen).expect("Failed to parse FEN");
         let chess_game = Game::from_position(position);
         analyze_position(&chess_game, depth);
     }

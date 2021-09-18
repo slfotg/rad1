@@ -1,9 +1,8 @@
 use super::ChessAgent;
+use crate::game::Game;
+use chess::ChessMove;
 use rand::rngs::ThreadRng;
 use rand::Rng;
-use shakmaty::{Move, Position};
-
-use crate::game::Game;
 
 pub struct RandomChessAgent {
     pub rng: ThreadRng,
@@ -18,8 +17,8 @@ impl Default for RandomChessAgent {
 }
 
 impl ChessAgent for RandomChessAgent {
-    fn best_move(&mut self, game: &Game) -> Move {
-        let moves = game.position.legal_moves();
+    fn best_move(&mut self, game: &Game) -> ChessMove {
+        let moves = game.legal_moves().collect::<Vec<ChessMove>>();
         moves[self.rng.gen_range(0..moves.len())].clone()
     }
 }

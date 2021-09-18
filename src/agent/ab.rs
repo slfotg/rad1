@@ -1,12 +1,9 @@
 use super::ChessAgent;
-use shakmaty::san::San;
-use shakmaty::{Move, Position};
-use std::cmp;
-use std::cmp::Ordering;
-
 use crate::eval::Evaluation;
 use crate::game::Game;
 use crate::tt::*;
+use std::cmp;
+use std::cmp::Ordering;
 
 // quiescence search
 fn q_search(game: &Game, mut alpha: i16, beta: i16) -> i16 {
@@ -38,8 +35,8 @@ fn null_alpha_beta(game: &Game, depth: usize, mut alpha: i16, beta: i16) -> i16 
     if depth == 0 {
         Evaluation::evaluate(game)
     } else {
-        for child_move in game.sorted_moves().iter() {
-            let val = -null_alpha_beta(&game.play(child_move), depth - 1, -beta, -alpha);
+        for child_move in game.sorted_moves() {
+            let val = -null_alpha_beta(&game.play(&child_move), depth - 1, -beta, -alpha);
             if val >= beta {
                 return beta;
             }

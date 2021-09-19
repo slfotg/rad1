@@ -1,7 +1,7 @@
 use super::Command;
 use crate::agent;
 use crate::agent::ChessAgent;
-use chess::Board;
+use chess::Game;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use std::str::FromStr;
 
@@ -24,6 +24,19 @@ impl<'a, 'b> Command<'a, 'b> for AnalyzeCommand {
         SubCommand::with_name(COMMAND_NAME)
             .about("Analyze a single position")
             .arg(
+                Arg::with_name("depth")
+                    .long("depth")
+                    .short("d")
+                    .required(false)
+                    .takes_value(true)
+                    .default_value("8")
+                    .possible_values(&["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"])
+                    .hide_possible_values(true)
+                    .help(
+                        "The depth of the search tree. Higher values means better move selections.",
+                    ),
+            )
+            .arg(
                 Arg::with_name("fen")
                     .long("fen")
                     .short("f")
@@ -33,14 +46,15 @@ impl<'a, 'b> Command<'a, 'b> for AnalyzeCommand {
             )
     }
 
-    fn exec_with_depth(&self, depth: usize, matches: &ArgMatches) {
+    fn exec(&self, matches: &ArgMatches) {
         let fen = matches.value_of("fen").unwrap();
-        let board = Board::from_str(fen).expect("Failed to parse FEN");
-        analyze_position(&board, depth);
+        let game = Game::from_str(fen).expect("Failed to parse FEN");
+        let depth: usize = matches.value_of("depth").unwrap().parse().unwrap();
+        analyze_position(&game, depth);
     }
 }
 
-fn analyze_position(board: &Board, depth: usize) {
+fn analyze_position(game: &Game, depth: usize) {
     let mut agent = agent::alpha_beta_agent(depth);
-    agent.best_move(board);
+    agent.get_action(game);
 }

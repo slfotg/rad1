@@ -1,8 +1,8 @@
 use super::ChessAgent;
 use crate::eval::Evaluation;
-use crate::tt::*;
 use crate::move_sorter::MOVE_SORTER;
-use chess::{Board, BoardStatus, ChessMove};
+use crate::tt::*;
+use chess::{Action, Board, BoardStatus, ChessMove, Game};
 use std::cmp;
 use std::cmp::Ordering;
 
@@ -134,7 +134,8 @@ impl Node {
         if !self.is_expanded() {
             let moves = MOVE_SORTER.sorted_moves(board);
             for m in moves.into_iter() {
-                self.children.push(Node::new(board.make_move_new(m), Some(m)));
+                self.children
+                    .push(Node::new(board.make_move_new(m), Some(m)));
             }
         }
     }
@@ -182,7 +183,8 @@ impl Node {
             Evaluation::evaluate(board)
         } else if depth == 0 {
             let value = q_search(board, alpha, beta);
-            trans_table.update_evaluation(board, CachedValue::Exact(board.get_hash(), depth, value));
+            trans_table
+                .update_evaluation(board, CachedValue::Exact(board.get_hash(), depth, value));
             value
         } else {
             if depth >= 3 {
@@ -257,13 +259,13 @@ impl AlphaBetaChessAgent {
 }
 
 impl ChessAgent for AlphaBetaChessAgent {
-    fn best_move(&mut self, board: &Board) -> ChessMove {
-        self.update_head(&board);
+    fn get_action(&mut self, game: &Game) -> Action {
+        self.update_head(&game.current_position());
         let alpha = Evaluation::MIN;
         let beta = Evaluation::MAX;
         let mut head = self.head.take().unwrap();
         for i in 1..=self.depth {
-            head.alpha_beta(&self.evaluator, &board, i, alpha, beta);
+            head.alpha_beta(&self.evaluator, &game.current_position(), i, alpha, beta);
             println!(
                 "{} - {} = {}",
                 i,
@@ -281,6 +283,6 @@ impl ChessAgent for AlphaBetaChessAgent {
 
         println!("Best move: {}", best_move);
         println!("Size: {}", self.size());
-        best_move
+        Action::MakeMove(best_move)
     }
 }

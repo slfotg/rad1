@@ -10,7 +10,7 @@ pub trait Command<'a, 'b> {
 
     fn options(&self) -> App<'a, 'b>;
 
-    fn exec_with_depth(&self, depth: usize, matches: &ArgMatches);
+    fn exec(&self, matches: &ArgMatches);
 }
 
 pub fn analyze() -> analyze::AnalyzeCommand {

@@ -10,7 +10,6 @@ chess = "3.2.0"
 clap = "2.33.3"
 itertools = "0.10.1"
 rand = "0.8.3"
-vampirc-uci = {version = "0.11", features = ["chess"]}
 
 [dev-dependencies]
 test-case = "1.1.0"

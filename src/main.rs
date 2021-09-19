@@ -7,7 +7,7 @@ fn main() {
     let play_command = command::play();
     let matches = App::new("Rad1 Chess Engine")
         .setting(AppSettings::SubcommandRequired)
-        .version("0.1.0")
+        .version("0.2.0")
         .author("Sam Foster <slfotg@gmail.com>")
         .about("A Simple Chess Engine in Rust")
         .subcommand(play_command.options())

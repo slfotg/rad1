@@ -1,30 +1,51 @@
 use crate::hash::CHESS_HASHER;
-use chess::{BitBoard, Board, ChessMove, EMPTY, MoveGen};
+use chess::{BitBoard, Board, BoardStatus, Color, ChessMove, MoveGen, EMPTY};
 use std::cmp::Ordering;
 
 #[derive(Debug, Clone)]
 pub struct Game {
-    pub position: Board,
-    pub hash: u64,
-    pub history: Vec<u64>,
+    board: Board,
+    hash: u64,
 }
 
 impl Default for Game {
     fn default() -> Self {
-        Self::from_position(Board::default())
+        Self::from_board(Board::default())
     }
 }
 
 impl Game {
-    pub fn new(position: Board, hash: u64) -> Self {
+    pub fn new(board: Board, hash: u64) -> Self {
         let mut history = Vec::with_capacity(200);
         history.push(hash);
-        Self { position, hash, history }
+        Self {
+            board,
+            hash,
+        }
     }
 
-    pub fn from_position(position: Board) -> Self {
-        let hash = CHESS_HASHER.hash(&position);
-        Self::new(position, hash)
+    pub fn from_board(board: Board) -> Self {
+        let hash = CHESS_HASHER.hash(&board);
+        Self::new(board, hash)
+    }
+
+    pub fn get_board(&self) -> Board {
+        self.board
+    }
+
+    pub fn turn(&self) -> Color {
+        self.board.side_to_move()
+    }
+
+    pub fn is_game_over(&self) -> bool {
+        match self.board.status() {
+            BoardStatus::Ongoing => false,
+            _ => true,
+        }
+    }
+
+    pub fn is_check(&self) -> bool {
+        self.board.checkers().popcnt() > 0
     }
 
     #[inline]
@@ -32,12 +53,9 @@ impl Game {
         self.hash
     }
 
-    fn current_color_pieces(&self) -> &BitBoard {
-        self.position.color_combined(self.position.side_to_move())
-    }
-
+    #[inline]
     fn opponent_color_pieces(&self) -> &BitBoard {
-        self.position.color_combined(!self.position.side_to_move())
+        self.board.color_combined(!self.board.side_to_move())
     }
 
     fn is_capture(&self, chess_move: ChessMove) -> bool {
@@ -57,13 +75,16 @@ impl Game {
         }
     }
 
+    pub fn is_legal(&self, chess_move: ChessMove) -> bool {
+        self.board.legal(chess_move)
+    }
+
     pub fn play_mut(&mut self, chess_move: ChessMove) {
-        let next_position = self.position.make_move_new(chess_move);
+        let next_board = self.board.make_move_new(chess_move);
         let next_hash =
-            CHESS_HASHER.update_hash(self.hash, &self.position, &next_position, chess_move);
-        self.position = next_position;
+            CHESS_HASHER.update_hash(self.hash, &self.board, &next_board);
+        self.board = next_board;
         self.hash = next_hash;
-        self.history.push(next_hash);
     }
 
     pub fn play(&self, chess_move: ChessMove) -> Self {
@@ -74,7 +95,7 @@ impl Game {
 
     #[inline]
     pub fn legal_moves(&self) -> MoveGen {
-        MoveGen::new_legal(&self.position)
+        MoveGen::new_legal(&self.board)
     }
 
     pub fn sorted_moves(&self) -> Vec<ChessMove> {
@@ -84,7 +105,7 @@ impl Game {
     }
 
     pub fn captures(&self) -> MoveGen {
-        let mut moves = MoveGen::new_legal(&self.position);
+        let mut moves = MoveGen::new_legal(&self.board);
         moves.set_iterator_mask(*self.opponent_color_pieces());
         moves
     }
@@ -92,8 +113,9 @@ impl Game {
     fn capture_score(&self, a: &ChessMove) -> i8 {
         let values = [1, 3, 3, 5, 9, 0];
         if self.is_capture(*a) {
-            values[a.role() as usize] - values[a.capture().unwrap() as usize]
-        } else if a.is_promotion() {
+            values[self.board.piece_on(a.get_source()).unwrap() as usize]
+                - values[self.board.piece_on(a.get_dest()).unwrap() as usize]
+        } else if self.is_promotion(*a) {
             10
         } else {
             i8::MAX
@@ -111,6 +133,9 @@ impl Game {
     }
 
     pub fn swap_turn(&self) -> Option<Game> {
-        self.position.null_move().map(|p| Self::from_position(p))
+        self.board.null_move().map(|board| Self {
+            board,
+            hash: CHESS_HASHER.update_color_hash(self.hash)
+        })
     }
 }

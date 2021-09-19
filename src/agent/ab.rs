@@ -16,7 +16,7 @@ fn q_search(game: &Game, mut alpha: i16, beta: i16) -> i16 {
             alpha = evaluation;
         }
         for m in game.sorted_captures().into_iter() {
-            let score = -q_search(&game.play(&m), -beta, -alpha);
+            let score = -q_search(&game.play(m), -beta, -alpha);
             if score >= beta {
                 alpha = beta;
                 break;
@@ -165,7 +165,7 @@ impl Node {
         mut alpha: i16,
         mut beta: i16,
     ) -> i16 {
-        if game.position.is_check() && depth > 0 {
+        if game.is_check() && depth > 0 {
             depth += 1;
         }
         let alpha_orig = alpha;
@@ -177,7 +177,7 @@ impl Node {
             cached_evaluation(trans_table, game, depth, &mut value, &mut alpha, &mut beta);
         let value = if let Some(evaluation) = cached_evaluation {
             evaluation
-        } else if game.position.is_game_over() {
+        } else if game.is_game_over() {
             Evaluation::evaluate(game)
         } else if depth == 0 {
             let value = q_search(game, alpha, beta);
@@ -185,8 +185,8 @@ impl Node {
             value
         } else {
             if depth >= 3 {
-                if let Ok(null_move) = game.swap_turn() {
-                    let score = -null_alpha_beta(&null_move, depth - 3, -beta, -beta + 1);
+                if let Some(null_move_game) = game.swap_turn() {
+                    let score = -null_alpha_beta(&null_move_game, depth - 3, -beta, -beta + 1);
                     if score >= beta {
                         self.evaluation = Some(beta);
                         return beta;
@@ -198,7 +198,7 @@ impl Node {
 
                 let child_value = -child_node.alpha_beta(
                     trans_table,
-                    &game.play(&child_move),
+                    &game.play(child_move),
                     depth - 1,
                     -beta,
                     -alpha,
@@ -256,7 +256,7 @@ impl AlphaBetaChessAgent {
 }
 
 impl ChessAgent for AlphaBetaChessAgent {
-    fn best_move(&mut self, game: &Game) -> Move {
+    fn best_move(&mut self, game: &Game) -> ChessMove {
         self.update_head(&game);
         let alpha = Evaluation::MIN;
         let beta = Evaluation::MAX;
@@ -264,9 +264,9 @@ impl ChessAgent for AlphaBetaChessAgent {
         for i in 1..=self.depth {
             head.alpha_beta(&self.evaluator, &game, i, alpha, beta);
             println!(
-                "{} - {} = {:?}",
+                "{} - {} = {}",
                 i,
-                San::from_move(&game.position, &head.best_move().unwrap()).to_string(),
+                &head.best_move().unwrap(),
                 head.evaluation.unwrap(),
             );
         }
@@ -278,10 +278,7 @@ impl ChessAgent for AlphaBetaChessAgent {
         let first_child = head.first_child();
         self.head = Some(first_child);
 
-        println!(
-            "Best move: {}",
-            San::from_move(&game.position, &best_move).to_string()
-        );
+        println!("Best move: {}", best_move);
         println!("Size: {}", self.size());
         best_move
     }

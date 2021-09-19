@@ -1,32 +1,22 @@
-use crate::hash::CHESS_HASHER;
 use chess::{BitBoard, Board, BoardStatus, Color, ChessMove, MoveGen, EMPTY};
 use std::cmp::Ordering;
 
 #[derive(Debug, Clone)]
 pub struct Game {
     board: Board,
-    hash: u64,
 }
 
 impl Default for Game {
     fn default() -> Self {
-        Self::from_board(Board::default())
+        Self::new(Board::default())
     }
 }
 
 impl Game {
-    pub fn new(board: Board, hash: u64) -> Self {
-        let mut history = Vec::with_capacity(200);
-        history.push(hash);
+    pub fn new(board: Board) -> Self {
         Self {
-            board,
-            hash,
+            board
         }
-    }
-
-    pub fn from_board(board: Board) -> Self {
-        let hash = CHESS_HASHER.hash(&board);
-        Self::new(board, hash)
     }
 
     pub fn get_board(&self) -> Board {
@@ -50,7 +40,7 @@ impl Game {
 
     #[inline]
     pub fn hash(&self) -> u64 {
-        self.hash
+        self.board.get_hash()
     }
 
     #[inline]
@@ -81,10 +71,7 @@ impl Game {
 
     pub fn play_mut(&mut self, chess_move: ChessMove) {
         let next_board = self.board.make_move_new(chess_move);
-        let next_hash =
-            CHESS_HASHER.update_hash(self.hash, &self.board, &next_board);
         self.board = next_board;
-        self.hash = next_hash;
     }
 
     pub fn play(&self, chess_move: ChessMove) -> Self {
@@ -135,7 +122,6 @@ impl Game {
     pub fn swap_turn(&self) -> Option<Game> {
         self.board.null_move().map(|board| Self {
             board,
-            hash: CHESS_HASHER.update_color_hash(self.hash)
         })
     }
 }

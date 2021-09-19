@@ -51,7 +51,7 @@ impl<'a, 'b> Command<'a, 'b> for PlayCommand {
     fn exec_with_depth(&self, depth: usize, matches: &ArgMatches) {
         let start_position = matches.value_of("start-position").unwrap();
         let board = Board::from_str(start_position).expect("Failed to parse FEN");
-        let mut chess_game = Game::from_board(board);
+        let mut chess_game = Game::new(board);
         let color = matches.value_of("color").unwrap();
 
         if color == "White" {

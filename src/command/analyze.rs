@@ -37,7 +37,7 @@ impl<'a, 'b> Command<'a, 'b> for AnalyzeCommand {
     fn exec_with_depth(&self, depth: usize, matches: &ArgMatches) {
         let fen = matches.value_of("fen").unwrap();
         let board = Board::from_str(fen).expect("Failed to parse FEN");
-        let chess_game = Game::from_board(board);
+        let chess_game = Game::new(board);
         analyze_position(&chess_game, depth);
     }
 }

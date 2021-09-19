@@ -8,9 +8,8 @@ and to actually learn the language.
 This is just be a fun side project with no real intent of making
 a chess engine that is in any way competetive. I just wanted to see
 if I could write a chess engine that I couldn't beat (I'm not that good ~1200-1300).
-It uses [shakmaty](https://github.com/niklasf/shakmaty) for
-move generation but [chess](https://github.com/jordanbray/chess) was
-considered initially and I might move to that down the road.
+It uses [chess](https://github.com/jordanbray/chess) for move generation
+and board and game representation.
 The [Chess Programming Wiki](https://www.chessprogramming.org/Main_Page)
 has been a great resource for learning how to do this along with
 [The Rust Book](https://doc.rust-lang.org/stable/book/).
@@ -48,9 +47,9 @@ It's better to build a release version of the code instead of just using `cargo 
 Help:
 
     ❯ ./target/release/rad1 --help
-    Rad1 Chess Engine 0.1.0
+    Rad1 Chess Engine 0.2.0
     Sam Foster <slfotg@gmail.com>
-    Simple Chess Engine in Rust
+    A Simple Chess Engine in Rust
 
     USAGE:
         rad1 <SUBCOMMAND>
@@ -71,13 +70,13 @@ To play against the engine in the terminal:
 To evaluate a specific position from a FEN representation
 
     ❯ ./target/release/rad1 analyze --fen "r3k2r/1p3pp1/p1p4p/3pP3/1PP5/P2P1P2/2qnKQ1P/8 b kq - 7 28"
-    1 - Nxc4 = 146
-    2 - Ne4 = 226
-    3 - Ne4 = 236
-    4 - Ne4 = 238
-    5 - Ne4 = 32767
-    6 - Ne4 = 32767
-    7 - Ne4 = 32767
-    8 - Ne4 = 32767
-    Best move: Ne4
-    Size: 10984
+    1 - d2c4 = 145
+    2 - d2e4 = 224
+    3 - d2e4 = 234
+    4 - d2e4 = 237
+    5 - d2e4 = 32767
+    6 - d2e4 = 32767
+    7 - d2e4 = 32767
+    8 - d2e4 = 32767
+    Best move: d2e4
+    Size: 17779

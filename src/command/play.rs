@@ -1,14 +1,12 @@
 use super::Command;
-use ansi_term::Colour;
-use ansi_term::Style;
-use clap::{App, Arg, ArgMatches, SubCommand};
-use itertools::Either;
-use shakmaty::fen::Fen;
-use shakmaty::*;
-
 use crate::agent;
 use crate::agent::ChessAgent;
-use crate::game::Game;
+use ansi_term::Colour;
+use ansi_term::Style;
+use chess::{Action, Board, Color, Game, Piece, Rank, Square};
+use clap::{App, Arg, ArgMatches, SubCommand};
+use itertools::Either;
+use std::str::FromStr;
 
 const COMMAND_NAME: &str = "play";
 
@@ -28,6 +26,19 @@ impl<'a, 'b> Command<'a, 'b> for PlayCommand {
     fn options(&self) -> App<'a, 'b> {
         SubCommand::with_name(COMMAND_NAME)
             .about("Play against the chess engine from terminal")
+            .arg(
+                Arg::with_name("depth")
+                    .long("depth")
+                    .short("d")
+                    .required(false)
+                    .takes_value(true)
+                    .default_value("8")
+                    .possible_values(&["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"])
+                    .hide_possible_values(true)
+                    .help(
+                        "The depth of the search tree. Higher values means better move selections.",
+                    ),
+            )
             .arg(
                 Arg::with_name("start-position")
                     .long("from")
@@ -49,48 +60,49 @@ impl<'a, 'b> Command<'a, 'b> for PlayCommand {
             )
     }
 
-    fn exec_with_depth(&self, depth: usize, matches: &ArgMatches) {
+    fn exec(&self, matches: &ArgMatches) {
         let start_position = matches.value_of("start-position").unwrap();
-        let setup: Fen = start_position.parse().expect("Failed to parse FEN");
-        let position: Chess = setup
-            .position(CastlingMode::Standard)
-            .expect("Failed to setup position from FEN");
-        let mut chess_game = Game::from_position(position);
+        let mut game = Game::from_str(start_position).expect("Failed to parse FEN");
         let color = matches.value_of("color").unwrap();
+        let depth: usize = matches.value_of("depth").unwrap().parse().unwrap();
 
         if color == "White" {
             let mut white_player = agent::command_line_agent();
             let mut black_player = agent::alpha_beta_agent(depth);
-            play_game(&mut chess_game, &mut white_player, &mut black_player, false);
+            play_game(&mut game, &mut white_player, &mut black_player, false);
         } else {
             let mut white_player = agent::alpha_beta_agent(depth);
             let mut black_player = agent::command_line_agent();
-            play_game(&mut chess_game, &mut white_player, &mut black_player, true);
+            play_game(&mut game, &mut white_player, &mut black_player, true);
         }
     }
 }
 
 fn play_game(
-    chess_game: &mut Game,
+    game: &mut Game,
     white_player: &mut dyn ChessAgent,
     black_player: &mut dyn ChessAgent,
     reverse_board: bool,
 ) {
-    let mut current_player = chess_game.position.turn();
-    print_game(&chess_game.position, reverse_board);
-    while !chess_game.position.is_game_over() {
-        let best_move = match current_player {
-            Color::White => white_player.best_move(&chess_game),
-            Color::Black => black_player.best_move(&chess_game),
+    print_board(&game.current_position(), reverse_board);
+    while game.result() == None {
+        let action = match game.current_position().side_to_move() {
+            Color::White => white_player.get_action(&game),
+            Color::Black => black_player.get_action(&game),
         };
-        chess_game.play_mut(&best_move);
-        current_player = !current_player;
-        print_game(&chess_game.position, reverse_board);
+        match action {
+            Action::MakeMove(chess_move) => game.make_move(chess_move),
+            Action::OfferDraw(color) => game.offer_draw(color),
+            Action::AcceptDraw => game.accept_draw(),
+            Action::DeclareDraw => game.declare_draw(),
+            Action::Resign(color) => game.resign(color),
+        };
+        print_board(&game.current_position(), reverse_board);
     }
-    println!("{:?}", chess_game.position.outcome());
+    println!("{:?}", game.result().unwrap());
 }
 
-fn print_game(game: &Chess, reverse_board: bool) {
+fn print_board(board: &Board, reverse_board: bool) {
     #[cfg(target_os = "windows")]
     ansi_term::enable_ansi_support();
 
@@ -98,27 +110,32 @@ fn print_game(game: &Chess, reverse_board: bool) {
     let fg_black: Colour = Colour::Fixed(16);
     let bg_black: Style = fg_black.on(Colour::Fixed(34));
     let bg_white: Style = fg_black.on(Colour::Fixed(220));
-    let board = game.board();
     let range = if reverse_board {
-        Either::Left(0..8)
+        Either::Left(chess::ALL_RANKS.iter())
     } else {
-        Either::Right((0..8).rev())
+        Either::Right(chess::ALL_RANKS.iter().rev())
     };
     for rank in range {
-        print_rank(rank, &italic, &bg_black, &bg_white, board);
+        print_rank(rank, italic, bg_black, bg_white, board);
     }
     println!("{}", italic.paint("    A  B  C  D  E  F  G  H"));
 }
 
-fn print_rank(rank: u32, italic: &Style, bg_black: &Style, bg_white: &Style, board: &Board) {
+fn print_rank(rank: &Rank, italic: Style, bg_black: Style, bg_white: Style, board: &Board) {
     let mut line: String = String::new();
-    let mut background = if rank % 2 == 1 { bg_white } else { bg_black };
-    line.push_str(&italic.paint(format!(" {} ", rank + 1)).to_string());
-    for file in 0..8 {
-        let square = Square::new(rank * 8 + file);
-        let piece_char = board
-            .piece_at(square)
-            .map_or(" ", |piece| get_piece_char(piece));
+    let mut background = if rank.to_index() % 2 == 1 {
+        bg_white
+    } else {
+        bg_black
+    };
+    line.push_str(
+        &italic
+            .paint(format!(" {} ", rank.to_index() + 1))
+            .to_string(),
+    );
+    for file in chess::ALL_FILES.iter() {
+        let square = Square::make_square(*rank, *file);
+        let piece_char = get_piece_char(board.color_on(square), board.piece_on(square));
         line.push_str(&background.paint(format!(" {} ", piece_char)).to_string());
         background = if background == bg_white {
             bg_black
@@ -129,19 +146,20 @@ fn print_rank(rank: u32, italic: &Style, bg_black: &Style, bg_white: &Style, boa
     println!("{}", line);
 }
 
-fn get_piece_char(piece: Piece) -> &'static str {
-    match (piece.color, piece.role) {
-        (Color::White, Role::Pawn) => "♙",
-        (Color::White, Role::Knight) => "♘",
-        (Color::White, Role::Bishop) => "♗",
-        (Color::White, Role::Rook) => "♖",
-        (Color::White, Role::Queen) => "♕",
-        (Color::White, Role::King) => "♔",
-        (Color::Black, Role::Pawn) => "♟︎",
-        (Color::Black, Role::Knight) => "♞",
-        (Color::Black, Role::Bishop) => "♝",
-        (Color::Black, Role::Rook) => "♜",
-        (Color::Black, Role::Queen) => "♛",
-        (Color::Black, Role::King) => "♚",
+fn get_piece_char(color: Option<Color>, piece: Option<Piece>) -> &'static str {
+    match (color, piece) {
+        (Some(Color::White), Some(Piece::Pawn)) => "♙",
+        (Some(Color::White), Some(Piece::Knight)) => "♘",
+        (Some(Color::White), Some(Piece::Bishop)) => "♗",
+        (Some(Color::White), Some(Piece::Rook)) => "♖",
+        (Some(Color::White), Some(Piece::Queen)) => "♕",
+        (Some(Color::White), Some(Piece::King)) => "♔",
+        (Some(Color::Black), Some(Piece::Pawn)) => "♟︎",
+        (Some(Color::Black), Some(Piece::Knight)) => "♞",
+        (Some(Color::Black), Some(Piece::Bishop)) => "♝",
+        (Some(Color::Black), Some(Piece::Rook)) => "♜",
+        (Some(Color::Black), Some(Piece::Queen)) => "♛",
+        (Some(Color::Black), Some(Piece::King)) => "♚",
+        (_, _) => " ",
     }
 }

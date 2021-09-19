@@ -1,6 +1,4 @@
-use shakmaty::*;
-
-use crate::game::Game;
+use chess::{Board, BoardStatus, Piece};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Evaluation {}
@@ -11,9 +9,7 @@ impl Evaluation {
     pub const MIN: i16 = i16::MIN + 1; // -32767
     pub const MAX: i16 = i16::MAX; //  32767
     pub const ZERO: i16 = 0;
-    const PIECE_VALUES: [i16; 7] = [0, 10, 30, 30, 50, 90, 0];
-    const PIECE_FACTORS: [i16; 7] = [0, 1, 1, 1, 1, 1, 0];
-    const COLOR_FACTORS: [i16; 2] = [-1, 1];
+    const PIECE_VALUES: [i16; 6] = [10, 30, 30, 50, 90, 0];
     #[rustfmt::skip]
     const SQUARE_VALUES: [i16; 64] = [
         1, 1, 1, 1, 1, 1, 1, 1,
@@ -27,37 +23,38 @@ impl Evaluation {
     ];
 
     #[inline]
-    fn piece_value(piece: &Piece) -> i16 {
-        Self::PIECE_VALUES[piece.role as usize]
+    fn piece_value(piece: Piece) -> i16 {
+        Self::PIECE_VALUES[piece.to_index()]
     }
 
     #[inline]
-    fn position_value(square: &Square, piece: &Piece) -> i16 {
-        Self::PIECE_FACTORS[piece.role as usize] * Self::SQUARE_VALUES[*square as usize]
-    }
+    pub fn evaluate(board: &Board) -> i16 {
+        match board.status() {
+            BoardStatus::Stalemate => Self::ZERO,
+            BoardStatus::Checkmate => Self::MIN,
+            BoardStatus::Ongoing => {
+                let mut evaluation = 0;
+                let my_pieces = board.color_combined(board.side_to_move());
+                let their_pieces = board.color_combined(!board.side_to_move());
 
-    #[inline]
-    pub fn evaluate(game: &Game) -> i16 {
-        let color = game.position.turn() as usize;
-        if game.position.is_game_over() {
-            match game.position.outcome().unwrap().winner() {
-                Option::None => Self::ZERO,
-                Option::Some(color) => {
-                    if color == game.position.turn() {
-                        Self::MAX
-                    } else {
-                        Self::MIN
-                    }
+                // Piece Values
+                for &piece in chess::ALL_PIECES.iter() {
+                    let pieces = board.pieces(piece);
+                    let value = Self::piece_value(piece);
+                    evaluation += value
+                        * ((my_pieces & pieces).popcnt() as i16
+                            - (their_pieces & pieces).popcnt() as i16);
                 }
+
+                // Position Values
+                for square in *my_pieces {
+                    evaluation += Self::SQUARE_VALUES[square.to_index()];
+                }
+                for square in *their_pieces {
+                    evaluation -= Self::SQUARE_VALUES[square.to_index()];
+                }
+                evaluation
             }
-        } else {
-            let mut evaluation = 0;
-            for (square, piece) in game.position.board().pieces() {
-                let color = piece.color as usize;
-                evaluation += Self::COLOR_FACTORS[color] * Self::piece_value(&piece);
-                evaluation += Self::COLOR_FACTORS[color] * Self::position_value(&square, &piece);
-            }
-            Self::COLOR_FACTORS[color] * evaluation
         }
     }
 }
@@ -65,28 +62,21 @@ impl Evaluation {
 #[cfg(test)]
 mod tests {
     use super::Evaluation;
-    use crate::game::Game;
-    use shakmaty::*;
+    use chess::{Board, ChessMove, Square};
 
     #[test]
     fn initial_board_eval() {
-        let game = Game::default();
-        let evaluation = Evaluation::evaluate(&game);
+        let board = Board::default();
+        let evaluation = Evaluation::evaluate(&board);
         assert_eq!(evaluation, 0);
     }
 
     #[test]
     fn e4_black_turn_eval() {
-        let mut game = Game::default();
-        let m: Move = Move::Normal {
-            role: Role::Pawn,
-            from: Square::E2,
-            capture: None,
-            to: Square::E4,
-            promotion: None,
-        };
-        game.play_mut(&m);
-        let evaluation = Evaluation::evaluate(&game);
+        let board = Board::default();
+        let chess_move = ChessMove::new(Square::E2, Square::E4, None);
+        let board = board.make_move_new(chess_move);
+        let evaluation = Evaluation::evaluate(&board);
         assert_eq!(evaluation, -2);
     }
 }

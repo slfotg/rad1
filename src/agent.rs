@@ -1,28 +1,21 @@
-use shakmaty::Move;
-
-use crate::game::Game;
+use chess::{Action, Game};
 
 mod ab;
-mod naive;
 mod random;
 mod cli;
 
 pub trait ChessAgent {
-    fn best_move(&mut self, game: &Game) -> Move;
+    fn get_action(&mut self, game: &Game) -> Action;
 }
 
-pub fn random_chess_agent() -> impl ChessAgent {
+pub fn random_chess_agent() -> random::RandomChessAgent {
     random::RandomChessAgent::default()
 }
 
-pub fn command_line_agent() -> impl ChessAgent {
+pub fn command_line_agent() -> cli::CommandLineAgent {
     cli::CommandLineAgent::default()
 }
 
-pub fn naive_chess_agent(depth: usize) -> impl ChessAgent {
-    naive::NaiveChessAgent::new(depth)
-}
-
-pub fn alpha_beta_agent(depth: usize) -> impl ChessAgent {
+pub fn alpha_beta_agent(depth: usize) -> ab::AlphaBetaChessAgent {
     ab::AlphaBetaChessAgent::new(depth)
 }

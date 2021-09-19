@@ -1,6 +1,5 @@
 use super::ChessAgent;
-use crate::game::Game;
-use chess::ChessMove;
+use chess::{Board, ChessMove};
 use core::str::FromStr;
 use std::io;
 
@@ -13,7 +12,7 @@ impl Default for CommandLineAgent {
 }
 
 impl ChessAgent for CommandLineAgent {
-    fn best_move(&mut self, game: &Game) -> ChessMove {
+    fn best_move(&mut self, board: &Board) -> ChessMove {
         let chess_move: ChessMove;
         loop {
             println!("Please enter move (Long algebraic notation)");
@@ -25,7 +24,7 @@ impl ChessAgent for CommandLineAgent {
             let uci_move = uci_move.trim();
             match ChessMove::from_str(uci_move) {
                 Ok(uci) => {
-                    if game.is_legal(uci) {
+                    if board.legal(uci) {
                         chess_move = uci;
                         break;
                     } else {

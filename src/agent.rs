@@ -1,12 +1,11 @@
-use crate::game::Game;
-use chess::ChessMove;
+use chess::{Board, ChessMove};
 
 mod ab;
 mod random;
 mod cli;
 
 pub trait ChessAgent {
-    fn best_move(&mut self, game: &Game) -> ChessMove;
+    fn best_move(&mut self, board: &Board) -> ChessMove;
 }
 
 pub fn random_chess_agent() -> random::RandomChessAgent {

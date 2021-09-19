@@ -1,7 +1,6 @@
 use super::Command;
 use crate::agent;
 use crate::agent::ChessAgent;
-use crate::game::Game;
 use chess::Board;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use std::str::FromStr;
@@ -37,12 +36,11 @@ impl<'a, 'b> Command<'a, 'b> for AnalyzeCommand {
     fn exec_with_depth(&self, depth: usize, matches: &ArgMatches) {
         let fen = matches.value_of("fen").unwrap();
         let board = Board::from_str(fen).expect("Failed to parse FEN");
-        let chess_game = Game::new(board);
-        analyze_position(&chess_game, depth);
+        analyze_position(&board, depth);
     }
 }
 
-fn analyze_position(chess_game: &Game, depth: usize) {
+fn analyze_position(board: &Board, depth: usize) {
     let mut agent = agent::alpha_beta_agent(depth);
-    agent.best_move(chess_game);
+    agent.best_move(board);
 }

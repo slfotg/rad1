@@ -1,22 +1,22 @@
 use super::ChessAgent;
 use crate::eval::Evaluation;
-use crate::game::Game;
 use crate::tt::*;
-use chess::ChessMove;
+use crate::move_sorter::MOVE_SORTER;
+use chess::{Board, BoardStatus, ChessMove};
 use std::cmp;
 use std::cmp::Ordering;
 
 // quiescence search
-fn q_search(game: &Game, mut alpha: i16, beta: i16) -> i16 {
-    let evaluation = Evaluation::evaluate(game);
+fn q_search(board: &Board, mut alpha: i16, beta: i16) -> i16 {
+    let evaluation = Evaluation::evaluate(board);
     if evaluation >= beta {
         beta
     } else {
         if alpha < evaluation {
             alpha = evaluation;
         }
-        for m in game.sorted_captures().into_iter() {
-            let score = -q_search(&game.play(m), -beta, -alpha);
+        for m in MOVE_SORTER.sorted_captures(board).into_iter() {
+            let score = -q_search(&board.make_move_new(m), -beta, -alpha);
             if score >= beta {
                 alpha = beta;
                 break;
@@ -32,12 +32,12 @@ fn q_search(game: &Game, mut alpha: i16, beta: i16) -> i16 {
 // this is really just a pure alpha beta search
 // with no caching or storing evaluations in nodes
 // used for the null move heursitic
-fn null_alpha_beta(game: &Game, depth: usize, mut alpha: i16, beta: i16) -> i16 {
+fn null_alpha_beta(board: &Board, depth: usize, mut alpha: i16, beta: i16) -> i16 {
     if depth == 0 {
-        Evaluation::evaluate(game)
+        Evaluation::evaluate(board)
     } else {
-        for child_move in game.sorted_moves() {
-            let val = -null_alpha_beta(&game.play(child_move), depth - 1, -beta, -alpha);
+        for child_move in MOVE_SORTER.sorted_moves(board) {
+            let val = -null_alpha_beta(&board.make_move_new(child_move), depth - 1, -beta, -alpha);
             if val >= beta {
                 return beta;
             }
@@ -51,13 +51,13 @@ fn null_alpha_beta(game: &Game, depth: usize, mut alpha: i16, beta: i16) -> i16 
 
 fn cached_evaluation(
     trans_table: &TranspositionTable,
-    game: &Game,
+    board: &Board,
     depth: usize,
     value: &mut i16,
     alpha: &mut i16,
     beta: &mut i16,
 ) -> Option<i16> {
-    match trans_table.get_evaluation(game) {
+    match trans_table.get_evaluation(board) {
         CachedValue::Empty => None,
         cached_eval => {
             if cached_eval.depth() >= depth {
@@ -91,7 +91,7 @@ struct Node {
 impl Default for Node {
     fn default() -> Self {
         Self {
-            hash: Game::default().hash(),
+            hash: Board::default().get_hash(),
             evaluation: None,
             chess_move: None,
             children: vec![],
@@ -100,9 +100,9 @@ impl Default for Node {
 }
 
 impl Node {
-    fn new(game: Game, chess_move: Option<ChessMove>) -> Self {
+    fn new(board: Board, chess_move: Option<ChessMove>) -> Self {
         Self {
-            hash: game.hash(),
+            hash: board.get_hash(),
             evaluation: None,
             chess_move,
             children: vec![],
@@ -110,16 +110,16 @@ impl Node {
     }
 
     fn best_move(&self) -> Option<ChessMove> {
-        self.children[0].chess_move.clone()
+        self.children[0].chess_move
     }
 
     fn first_child(&mut self) -> Self {
         self.children.remove(0)
     }
 
-    fn find_child(&mut self, game: &Game) -> Option<Self> {
+    fn find_child(&mut self, board: &Board) -> Option<Self> {
         for i in 0..self.children.len() {
-            if self.children[i].hash == game.hash() {
+            if self.children[i].hash == board.get_hash() {
                 return Some(self.children.remove(i));
             }
         }
@@ -130,11 +130,11 @@ impl Node {
         !self.children.is_empty()
     }
 
-    fn expand(&mut self, game: &Game) {
+    fn expand(&mut self, board: &Board) {
         if !self.is_expanded() {
-            let moves = game.sorted_moves();
+            let moves = MOVE_SORTER.sorted_moves(board);
             for m in moves.into_iter() {
-                self.children.push(Node::new(game.play(m), Some(m)));
+                self.children.push(Node::new(board.make_move_new(m), Some(m)));
             }
         }
     }
@@ -160,32 +160,33 @@ impl Node {
     fn alpha_beta(
         &mut self,
         trans_table: &TranspositionTable,
-        game: &Game,
+        board: &Board,
         mut depth: usize,
         mut alpha: i16,
         mut beta: i16,
     ) -> i16 {
-        if game.is_check() && depth > 0 {
+        if board.checkers().popcnt() > 0 && depth > 0 {
             depth += 1;
         }
+        let status = board.status();
         let alpha_orig = alpha;
         let mut value = Evaluation::MIN;
         if depth > 0 {
-            self.expand(game);
+            self.expand(board);
         }
         let cached_evaluation =
-            cached_evaluation(trans_table, game, depth, &mut value, &mut alpha, &mut beta);
+            cached_evaluation(trans_table, board, depth, &mut value, &mut alpha, &mut beta);
         let value = if let Some(evaluation) = cached_evaluation {
             evaluation
-        } else if game.is_game_over() {
-            Evaluation::evaluate(game)
+        } else if status != BoardStatus::Ongoing {
+            Evaluation::evaluate(board)
         } else if depth == 0 {
-            let value = q_search(game, alpha, beta);
-            trans_table.update_evaluation(game, CachedValue::Exact(game.hash(), depth, value));
+            let value = q_search(board, alpha, beta);
+            trans_table.update_evaluation(board, CachedValue::Exact(board.get_hash(), depth, value));
             value
         } else {
             if depth >= 3 {
-                if let Some(null_move_game) = game.swap_turn() {
+                if let Some(null_move_game) = board.null_move() {
                     let score = -null_alpha_beta(&null_move_game, depth - 3, -beta, -beta + 1);
                     if score >= beta {
                         self.evaluation = Some(beta);
@@ -198,7 +199,7 @@ impl Node {
 
                 let child_value = -child_node.alpha_beta(
                     trans_table,
-                    &game.play(child_move),
+                    &board.make_move_new(child_move),
                     depth - 1,
                     -beta,
                     -alpha,
@@ -211,13 +212,13 @@ impl Node {
             }
             self.sort_children_by_evaluation();
             let cached_eval = if value <= alpha_orig {
-                CachedValue::Beta(game.hash(), depth, value)
+                CachedValue::Beta(board.get_hash(), depth, value)
             } else if value >= beta {
-                CachedValue::Alpha(game.hash(), depth, value)
+                CachedValue::Alpha(board.get_hash(), depth, value)
             } else {
-                CachedValue::Exact(game.hash(), depth, value)
+                CachedValue::Exact(board.get_hash(), depth, value)
             };
-            trans_table.update_evaluation(&game, cached_eval);
+            trans_table.update_evaluation(&board, cached_eval);
             value
         };
         self.evaluation = Some(value);
@@ -244,25 +245,25 @@ impl AlphaBetaChessAgent {
         self.head.as_ref().unwrap().size()
     }
 
-    fn update_head(&mut self, game: &Game) {
-        let child = self.head.as_mut().unwrap().find_child(game);
+    fn update_head(&mut self, board: &Board) {
+        let child = self.head.as_mut().unwrap().find_child(board);
         if child.is_some() {
             self.head = child;
         } else {
-            self.head = Some(Node::new(game.clone(), None));
+            self.head = Some(Node::new(*board, None));
             self.evaluator = TranspositionTable::default();
         }
     }
 }
 
 impl ChessAgent for AlphaBetaChessAgent {
-    fn best_move(&mut self, game: &Game) -> ChessMove {
-        self.update_head(&game);
+    fn best_move(&mut self, board: &Board) -> ChessMove {
+        self.update_head(&board);
         let alpha = Evaluation::MIN;
         let beta = Evaluation::MAX;
         let mut head = self.head.take().unwrap();
         for i in 1..=self.depth {
-            head.alpha_beta(&self.evaluator, &game, i, alpha, beta);
+            head.alpha_beta(&self.evaluator, &board, i, alpha, beta);
             println!(
                 "{} - {} = {}",
                 i,

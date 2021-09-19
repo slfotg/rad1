@@ -1,5 +1,4 @@
-use crate::game::Game;
-use chess::{BoardStatus, Piece};
+use chess::{Board, BoardStatus, Piece};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Evaluation {}
@@ -29,15 +28,14 @@ impl Evaluation {
     }
 
     #[inline]
-    pub fn evaluate(game: &Game) -> i16 {
-        let board = game.get_board();
+    pub fn evaluate(board: &Board) -> i16 {
         match board.status() {
             BoardStatus::Stalemate => Self::ZERO,
             BoardStatus::Checkmate => Self::MIN,
             BoardStatus::Ongoing => {
                 let mut evaluation = 0;
-                let my_pieces = board.color_combined(game.turn());
-                let their_pieces = board.color_combined(!game.turn());
+                let my_pieces = board.color_combined(board.side_to_move());
+                let their_pieces = board.color_combined(!board.side_to_move());
 
                 // Piece Values
                 for &piece in chess::ALL_PIECES.iter() {
@@ -64,22 +62,21 @@ impl Evaluation {
 #[cfg(test)]
 mod tests {
     use super::Evaluation;
-    use crate::game::Game;
-    use chess::{ChessMove, Square};
+    use chess::{Board, ChessMove, Square};
 
     #[test]
     fn initial_board_eval() {
-        let game = Game::default();
-        let evaluation = Evaluation::evaluate(&game);
+        let board = Board::default();
+        let evaluation = Evaluation::evaluate(&board);
         assert_eq!(evaluation, 0);
     }
 
     #[test]
     fn e4_black_turn_eval() {
-        let mut game = Game::default();
+        let board = Board::default();
         let chess_move = ChessMove::new(Square::E2, Square::E4, None);
-        game.play_mut(chess_move);
-        let evaluation = Evaluation::evaluate(&game);
+        let board = board.make_move_new(chess_move);
+        let evaluation = Evaluation::evaluate(&board);
         assert_eq!(evaluation, -2);
     }
 }

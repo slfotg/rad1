@@ -1,6 +1,5 @@
 use super::ChessAgent;
-use crate::game::Game;
-use chess::ChessMove;
+use chess::{Board, ChessMove, MoveGen};
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
@@ -17,8 +16,8 @@ impl Default for RandomChessAgent {
 }
 
 impl ChessAgent for RandomChessAgent {
-    fn best_move(&mut self, game: &Game) -> ChessMove {
-        let moves = game.legal_moves().collect::<Vec<ChessMove>>();
-        moves[self.rng.gen_range(0..moves.len())].clone()
+    fn best_move(&mut self, board: &Board) -> ChessMove {
+        let moves = MoveGen::new_legal(board).collect::<Vec<ChessMove>>();
+        moves[self.rng.gen_range(0..moves.len())]
     }
 }

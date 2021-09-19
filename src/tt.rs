@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use crate::game::Game;
+use chess::Board;
 
 const CACHE_SIZE: usize = 16777216;
 
@@ -62,16 +62,16 @@ impl TranspositionTable {
         Self { cache, cache_size }
     }
 
-    pub fn get_evaluation(&self, game: &Game) -> CachedValue {
+    pub fn get_evaluation(&self, board: &Board) -> CachedValue {
         let cached_value = {
-            *self.cache[(game.hash() % self.cache_size) as usize]
+            *self.cache[(board.get_hash() % self.cache_size) as usize]
                 .lock()
                 .unwrap()
         };
         match cached_value {
             CachedValue::Empty => CachedValue::Empty,
             val => {
-                if val.hash() == game.hash() {
+                if val.hash() == board.get_hash() {
                     val
                 } else {
                     CachedValue::Empty
@@ -80,8 +80,8 @@ impl TranspositionTable {
         }
     }
 
-    pub fn update_evaluation(&self, game: &Game, cached_eval: CachedValue) {
-        let mut cached_value = self.cache[(game.hash() % self.cache_size) as usize]
+    pub fn update_evaluation(&self, board: &Board, cached_eval: CachedValue) {
+        let mut cached_value = self.cache[(board.get_hash() % self.cache_size) as usize]
             .lock()
             .unwrap();
         *cached_value = cached_eval;

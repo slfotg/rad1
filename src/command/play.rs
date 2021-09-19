@@ -1,7 +1,6 @@
 use super::Command;
 use crate::agent;
 use crate::agent::ChessAgent;
-use crate::game::Game;
 use ansi_term::Colour;
 use ansi_term::Style;
 use chess::{Board, BoardStatus, Color, Piece, Rank, Square};
@@ -50,40 +49,39 @@ impl<'a, 'b> Command<'a, 'b> for PlayCommand {
 
     fn exec_with_depth(&self, depth: usize, matches: &ArgMatches) {
         let start_position = matches.value_of("start-position").unwrap();
-        let board = Board::from_str(start_position).expect("Failed to parse FEN");
-        let mut chess_game = Game::new(board);
+        let mut board = Board::from_str(start_position).expect("Failed to parse FEN");
         let color = matches.value_of("color").unwrap();
 
         if color == "White" {
             let mut white_player = agent::command_line_agent();
             let mut black_player = agent::alpha_beta_agent(depth);
-            play_game(&mut chess_game, &mut white_player, &mut black_player, false);
+            play_game(&mut board, &mut white_player, &mut black_player, false);
         } else {
             let mut white_player = agent::alpha_beta_agent(depth);
             let mut black_player = agent::command_line_agent();
-            play_game(&mut chess_game, &mut white_player, &mut black_player, true);
+            play_game(&mut board, &mut white_player, &mut black_player, true);
         }
     }
 }
 
 fn play_game(
-    chess_game: &mut Game,
+    board: &mut Board,
     white_player: &mut dyn ChessAgent,
     black_player: &mut dyn ChessAgent,
     reverse_board: bool,
 ) {
-    let mut current_player = chess_game.turn();
-    print_board(&chess_game.get_board(), reverse_board);
-    while chess_game.get_board().status() == BoardStatus::Ongoing {
+    let mut current_player = board.side_to_move();
+    print_board(board, reverse_board);
+    while board.status() == BoardStatus::Ongoing {
         let best_move = match current_player {
-            Color::White => white_player.best_move(&chess_game),
-            Color::Black => black_player.best_move(&chess_game),
+            Color::White => white_player.best_move(&board),
+            Color::Black => black_player.best_move(&board),
         };
-        chess_game.play_mut(best_move);
+        *board = board.make_move_new(best_move);
         current_player = !current_player;
-        print_board(&chess_game.get_board(), reverse_board);
+        print_board(board, reverse_board);
     }
-    println!("{:?}", chess_game.get_board().status());
+    println!("{:?}", board.status());
 }
 
 fn print_board(board: &Board, reverse_board: bool) {

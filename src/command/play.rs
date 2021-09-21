@@ -10,13 +10,8 @@ use std::str::FromStr;
 
 const COMMAND_NAME: &str = "play";
 
-pub struct PlayCommand {}
-
-impl Default for PlayCommand {
-    fn default() -> Self {
-        PlayCommand {}
-    }
-}
+#[derive(Default)]
+pub struct PlayCommand;
 
 impl<'a, 'b> Command<'a, 'b> for PlayCommand {
     fn command_name(&self) -> &'static str {

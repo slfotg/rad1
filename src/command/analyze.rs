@@ -7,13 +7,8 @@ use std::str::FromStr;
 
 const COMMAND_NAME: &str = "analyze";
 
-pub struct AnalyzeCommand {}
-
-impl Default for AnalyzeCommand {
-    fn default() -> Self {
-        AnalyzeCommand {}
-    }
-}
+#[derive(Default)]
+pub struct AnalyzeCommand;
 
 impl<'a, 'b> Command<'a, 'b> for AnalyzeCommand {
     fn command_name(&self) -> &'static str {

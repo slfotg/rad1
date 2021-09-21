@@ -3,13 +3,8 @@ use chess::{Action, ChessMove, Game};
 use core::str::FromStr;
 use std::io;
 
+#[derive(Default)]
 pub struct CommandLineAgent;
-
-impl Default for CommandLineAgent {
-    fn default() -> Self {
-        Self {}
-    }
-}
 
 impl ChessAgent for CommandLineAgent {
     fn get_action(&mut self, game: &Game) -> Action {

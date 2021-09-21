@@ -5,6 +5,10 @@ rust:
   - beta
   - nightly
 
+os:
+  - linux
+  - windows
+
 cache: cargo
 
 jobs:

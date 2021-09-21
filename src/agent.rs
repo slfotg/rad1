@@ -1,8 +1,8 @@
 use chess::{Action, Game};
 
 mod ab;
-mod random;
 mod cli;
+mod random;
 
 pub trait ChessAgent {
     fn get_action(&mut self, game: &Game) -> Action;

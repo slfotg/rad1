@@ -1,11 +1,9 @@
-
 use clap::{App, ArgMatches};
 
 mod analyze;
 mod play;
 
 pub trait Command<'a, 'b> {
-
     fn command_name(&self) -> &'static str;
 
     fn options(&self) -> App<'a, 'b>;

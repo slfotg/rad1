@@ -1,4 +1,4 @@
-use chess::{Board, BitBoard, ChessMove, MoveGen};
+use chess::{BitBoard, Board, ChessMove, MoveGen};
 use std::cmp::Ordering;
 
 pub struct MoveSorter;
@@ -6,7 +6,6 @@ pub struct MoveSorter;
 pub const MOVE_SORTER: MoveSorter = MoveSorter;
 
 impl MoveSorter {
-
     #[inline]
     pub fn sorted_moves(&self, board: &Board) -> Vec<ChessMove> {
         let mut moves = MoveGen::new_legal(board).collect::<Vec<ChessMove>>();
@@ -53,6 +52,7 @@ impl MoveSorter {
 
     #[inline]
     fn compare_moves(&self, board: &Board, a: &ChessMove, b: &ChessMove) -> Ordering {
-        self.capture_score(board, a).cmp(&self.capture_score(board, b))
+        self.capture_score(board, a)
+            .cmp(&self.capture_score(board, b))
     }
 }

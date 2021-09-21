@@ -99,7 +99,7 @@ fn play_game(
 
 fn print_board(board: &Board, reverse_board: bool) {
     #[cfg(target_os = "windows")]
-    ansi_term::enable_ansi_support();
+    ansi_term::enable_ansi_support().expect("ANSI colors not supported");
 
     let italic: Style = Style::new().italic();
     let fg_black: Colour = Colour::Fixed(16);

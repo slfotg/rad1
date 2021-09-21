@@ -87,8 +87,8 @@ fn play_game(
     print_board(&game.current_position(), reverse_board);
     while game.result() == None {
         let action = match game.current_position().side_to_move() {
-            Color::White => white_player.get_action(&game),
-            Color::Black => black_player.get_action(&game),
+            Color::White => white_player.get_action(game),
+            Color::Black => black_player.get_action(game),
         };
         match action {
             Action::MakeMove(chess_move) => game.make_move(chess_move),

@@ -197,7 +197,7 @@ impl Node {
                 }
             }
             for child_node in self.children.iter_mut() {
-                let child_move = child_node.chess_move.clone().unwrap();
+                let child_move = child_node.chess_move.unwrap();
 
                 let child_value = -child_node.alpha_beta(
                     trans_table,
@@ -220,7 +220,7 @@ impl Node {
             } else {
                 CachedValue::Exact(board.get_hash(), depth, value)
             };
-            trans_table.update_evaluation(&board, cached_eval);
+            trans_table.update_evaluation(board, cached_eval);
             value
         };
         self.evaluation = Some(value);

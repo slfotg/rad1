@@ -1,4 +1,7 @@
 # Rad1
+
+[![Build Status](https://app.travis-ci.com/slfotg/rad1.svg?branch=master)](https://app.travis-ci.com/github/slfotg/rad1)
+
 A Simple Chess Engine in Rust
 
 ## About
@@ -47,7 +50,7 @@ It's better to build a release version of the code instead of just using `cargo 
 Help:
 
     ❯ ./target/release/rad1 --help
-    Rad1 Chess Engine 0.2.0
+    Rad1 Chess Engine 0.2.1
     Sam Foster <slfotg@gmail.com>
     A Simple Chess Engine in Rust
 

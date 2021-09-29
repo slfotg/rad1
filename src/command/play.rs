@@ -105,18 +105,29 @@ fn print_board(board: &Board, reverse_board: bool) {
     let fg_black: Colour = Colour::Fixed(16);
     let bg_black: Style = fg_black.on(Colour::Fixed(34));
     let bg_white: Style = fg_black.on(Colour::Fixed(220));
-    let range = if reverse_board {
+    let ranks = if reverse_board {
         Either::Left(chess::ALL_RANKS.iter())
     } else {
         Either::Right(chess::ALL_RANKS.iter().rev())
     };
-    for rank in range {
-        print_rank(rank, italic, bg_black, bg_white, board);
+    for rank in ranks {
+        print_rank(rank, italic, bg_black, bg_white, board, reverse_board);
     }
-    println!("{}", italic.paint("    A  B  C  D  E  F  G  H"));
+    if reverse_board {
+        println!("{}", italic.paint("    H  G  F  E  D  C  B  A"));
+    } else {
+        println!("{}", italic.paint("    A  B  C  D  E  F  G  H"));
+    }
 }
 
-fn print_rank(rank: &Rank, italic: Style, bg_black: Style, bg_white: Style, board: &Board) {
+fn print_rank(
+    rank: &Rank,
+    italic: Style,
+    bg_black: Style,
+    bg_white: Style,
+    board: &Board,
+    reverse_board: bool,
+) {
     let mut line: String = String::new();
     let mut background = if rank.to_index() % 2 == 1 {
         bg_white
@@ -128,7 +139,12 @@ fn print_rank(rank: &Rank, italic: Style, bg_black: Style, bg_white: Style, boar
             .paint(format!(" {} ", rank.to_index() + 1))
             .to_string(),
     );
-    for file in chess::ALL_FILES.iter() {
+    let files = if reverse_board {
+        Either::Left(chess::ALL_FILES.iter().rev())
+    } else {
+        Either::Right(chess::ALL_FILES.iter())
+    };
+    for file in files {
         let square = Square::make_square(*rank, *file);
         let piece_char = get_piece_char(board.color_on(square), board.piece_on(square));
         line.push_str(&background.paint(format!(" {} ", piece_char)).to_string());

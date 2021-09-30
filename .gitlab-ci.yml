@@ -1,0 +1,44 @@
+stages:
+  - build
+  - test
+  - code-quality
+
+cargo-build:
+  stage: build
+  image: rust:1.55
+  tags:
+    - rad1
+  script:
+    - cargo build --release --verbose
+  artifacts:
+    paths:
+      - target/release/rad1
+    expire_in: 1 week
+
+cargo-test:
+  stage: test
+  image: rust:1.55
+  tags:
+    - rad1
+  script:
+    - cargo test --verbose
+
+check-formatting:
+  stage: code-quality
+  image: rust:1.55
+  tags:
+    - rad1
+  before_script:
+    - rustup component add rustfmt
+  script:
+    - cargo fmt --all -- --check
+
+lint:
+  stage: code-quality
+  image: rust:1.55
+  tags:
+    - rad1
+  before_script:
+    - rustup component add clippy
+  script:
+    - cargo clippy -- -D warnings

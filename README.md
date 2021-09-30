@@ -1,6 +1,6 @@
 # Rad1
 
-[![Build Status](https://app.travis-ci.com/slfotg/rad1.svg?branch=master)](https://app.travis-ci.com/github/slfotg/rad1)
+[![Build Status](https://gitlab.com/slfotg/rad1/badges/master/pipeline.svg)](https://gitlab.com/slfotg/rad1)
 
 A Simple Chess Engine in Rust
 

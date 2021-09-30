@@ -7,7 +7,7 @@ use std::io;
 pub struct CommandLineAgent;
 
 impl ChessAgent for CommandLineAgent {
-    fn get_action(&mut self, game: &Game) -> Action {
+    fn get_action(&self, game: &Game) -> Action {
         let action: Action;
         let board = game.current_position();
         loop {

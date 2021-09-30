@@ -50,6 +50,6 @@ impl<'a, 'b> Command<'a, 'b> for AnalyzeCommand {
 }
 
 fn analyze_position(game: &Game, depth: usize) {
-    let mut agent = agent::alpha_beta_agent(depth);
+    let agent = agent::alpha_beta_agent(depth);
     agent.get_action(game);
 }

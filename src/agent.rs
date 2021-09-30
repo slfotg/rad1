@@ -5,7 +5,7 @@ mod cli;
 mod random;
 
 pub trait ChessAgent {
-    fn get_action(&mut self, game: &Game) -> Action;
+    fn get_action(&self, game: &Game) -> Action;
 }
 
 pub fn random_chess_agent() -> random::RandomChessAgent {

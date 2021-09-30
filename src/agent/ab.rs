@@ -3,6 +3,7 @@ use crate::eval::Evaluation;
 use crate::move_sorter::MOVE_SORTER;
 use crate::tt::*;
 use chess::{Action, Board, BoardStatus, ChessMove, Game};
+use std::cell::RefCell;
 use std::cmp;
 use std::cmp::Ordering;
 
@@ -231,7 +232,7 @@ impl Node {
 pub struct AlphaBetaChessAgent {
     depth: usize,
     evaluator: TranspositionTable,
-    head: Option<Node>,
+    head: RefCell<Option<Node>>,
 }
 
 impl AlphaBetaChessAgent {
@@ -239,28 +240,33 @@ impl AlphaBetaChessAgent {
         AlphaBetaChessAgent {
             depth,
             evaluator: TranspositionTable::default(),
-            head: Some(Node::default()),
+            head: RefCell::new(Some(Node::default())),
         }
     }
 
     fn size(&self) -> usize {
-        self.head.as_ref().unwrap().size()
+        self.head.borrow().as_ref().unwrap().size()
     }
 
-    fn update_head(&mut self, board: &Board) {
-        let child = self.head.as_mut().unwrap().find_child(board);
+    fn update_position(&self, board: &Board) {
+        let head = self.head.borrow_mut().take();
+        let child = head.unwrap().find_child(board);
         if child.is_some() {
-            self.head = child;
+            self.update_head(child);
         } else {
-            self.head = Some(Node::new(*board, None));
-            self.evaluator = TranspositionTable::default();
+            self.update_head(Some(Node::new(*board, None)));
         }
+    }
+
+    fn update_head(&self, node: Option<Node>) {
+        let mut head = self.head.borrow_mut();
+        *head = node;
     }
 }
 
 impl ChessAgent for AlphaBetaChessAgent {
-    fn get_action(&mut self, game: &Game) -> Action {
-        self.update_head(&game.current_position());
+    fn get_action(&self, game: &Game) -> Action {
+        self.update_position(&game.current_position());
         let alpha = Evaluation::MIN;
         let beta = Evaluation::MAX;
         let mut head = self.head.take().unwrap();
@@ -279,7 +285,7 @@ impl ChessAgent for AlphaBetaChessAgent {
 
         // update head of tree
         let first_child = head.first_child();
-        self.head = Some(first_child);
+        self.update_head(Some(first_child));
 
         println!("Best move: {}", best_move);
         println!("Size: {}", self.size());

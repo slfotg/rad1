@@ -62,21 +62,21 @@ impl<'a, 'b> Command<'a, 'b> for PlayCommand {
         let depth: usize = matches.value_of("depth").unwrap().parse().unwrap();
 
         if color == "White" {
-            let mut white_player = agent::command_line_agent();
-            let mut black_player = agent::alpha_beta_agent(depth);
-            play_game(&mut game, &mut white_player, &mut black_player, false);
+            let white_player = agent::command_line_agent();
+            let black_player = agent::alpha_beta_agent(depth);
+            play_game(&mut game, &white_player, &black_player, false);
         } else {
-            let mut white_player = agent::alpha_beta_agent(depth);
-            let mut black_player = agent::command_line_agent();
-            play_game(&mut game, &mut white_player, &mut black_player, true);
+            let white_player = agent::alpha_beta_agent(depth);
+            let black_player = agent::command_line_agent();
+            play_game(&mut game, &white_player, &black_player, true);
         }
     }
 }
 
 fn play_game(
     game: &mut Game,
-    white_player: &mut dyn ChessAgent,
-    black_player: &mut dyn ChessAgent,
+    white_player: &dyn ChessAgent,
+    black_player: &dyn ChessAgent,
     reverse_board: bool,
 ) {
     print_board(&game.current_position(), reverse_board);

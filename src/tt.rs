@@ -3,6 +3,13 @@ use std::sync::Mutex;
 use chess::Board;
 
 const CACHE_SIZE: usize = 16777216;
+const DEFAULT_REPLACEMENT_STRATEGY: ReplacementStrategy = ReplacementStrategy::DepthPreferred;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReplacementStrategy {
+    Always,
+    DepthPreferred,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CachedValue {
@@ -27,7 +34,7 @@ impl CachedValue {
             Self::Exact(_, depth, _) => depth,
             Self::Alpha(_, depth, _) => depth,
             Self::Beta(_, depth, _) => depth,
-            _ => 0,
+            _ => usize::max_value(),
         }
     }
 
@@ -44,22 +51,31 @@ impl CachedValue {
 pub struct TranspositionTable {
     cache_size: u64,
     cache: Vec<Mutex<CachedValue>>,
+    strategy: ReplacementStrategy,
 }
 
 impl Default for TranspositionTable {
     fn default() -> Self {
-        Self::new(CACHE_SIZE)
+        Self::with_cache_size(CACHE_SIZE)
     }
 }
 
 impl TranspositionTable {
-    pub fn new(cache_size: usize) -> Self {
+    pub fn with_cache_size(cache_size: usize) -> Self {
+        Self::new(cache_size, DEFAULT_REPLACEMENT_STRATEGY)
+    }
+
+    pub fn new(cache_size: usize, strategy: ReplacementStrategy) -> Self {
         let mut cache = Vec::with_capacity(cache_size);
         for _ in 0..cache_size {
             cache.push(Mutex::new(CachedValue::Empty));
         }
         let cache_size = cache_size as u64;
-        Self { cache, cache_size }
+        Self {
+            cache,
+            cache_size,
+            strategy,
+        }
     }
 
     pub fn get_evaluation(&self, board: &Board) -> CachedValue {
@@ -84,6 +100,10 @@ impl TranspositionTable {
         let mut cached_value = self.cache[(board.get_hash() % self.cache_size) as usize]
             .lock()
             .unwrap();
-        *cached_value = cached_eval;
+        if self.strategy == ReplacementStrategy::Always
+            || cached_value.depth() >= cached_eval.depth()
+        {
+            *cached_value = cached_eval;
+        }
     }
 }

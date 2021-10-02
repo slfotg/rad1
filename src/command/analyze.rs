@@ -44,12 +44,12 @@ impl<'a, 'b> Command<'a, 'b> for AnalyzeCommand {
     fn exec(&self, matches: &ArgMatches) {
         let fen = matches.value_of("fen").unwrap();
         let game = Game::from_str(fen).expect("Failed to parse FEN");
-        let depth: usize = matches.value_of("depth").unwrap().parse().unwrap();
+        let depth: u8 = matches.value_of("depth").unwrap().parse().unwrap();
         analyze_position(&game, depth);
     }
 }
 
-fn analyze_position(game: &Game, depth: usize) {
+fn analyze_position(game: &Game, depth: u8) {
     let agent = agent::alpha_beta_agent(depth);
     agent.get_action(game);
 }

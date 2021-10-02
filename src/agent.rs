@@ -16,6 +16,6 @@ pub fn command_line_agent() -> cli::CommandLineAgent {
     cli::CommandLineAgent::default()
 }
 
-pub fn alpha_beta_agent(depth: usize) -> ab::AlphaBetaChessAgent {
+pub fn alpha_beta_agent(depth: u8) -> ab::AlphaBetaChessAgent {
     ab::AlphaBetaChessAgent::new(depth)
 }

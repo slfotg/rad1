@@ -59,7 +59,7 @@ impl<'a, 'b> Command<'a, 'b> for PlayCommand {
         let start_position = matches.value_of("start-position").unwrap();
         let mut game = Game::from_str(start_position).expect("Failed to parse FEN");
         let color = matches.value_of("color").unwrap();
-        let depth: usize = matches.value_of("depth").unwrap().parse().unwrap();
+        let depth: u8 = matches.value_of("depth").unwrap().parse().unwrap();
 
         if color == "White" {
             let white_player = agent::command_line_agent();

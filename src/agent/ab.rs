@@ -3,9 +3,8 @@ use crate::eval::Evaluation;
 use crate::move_sorter::MOVE_SORTER;
 use crate::tt::*;
 use chess::{Action, Board, BoardStatus, ChessMove, Game};
-use std::cell::RefCell;
 use std::cmp;
-use std::cmp::Ordering;
+use std::sync::Arc;
 
 // quiescence search
 fn q_search(board: &Board, mut alpha: i16, beta: i16) -> i16 {
@@ -33,7 +32,7 @@ fn q_search(board: &Board, mut alpha: i16, beta: i16) -> i16 {
 // this is really just a pure alpha beta search
 // with no caching or storing evaluations in nodes
 // used for the null move heursitic
-fn null_alpha_beta(board: &Board, depth: usize, mut alpha: i16, beta: i16) -> i16 {
+fn null_alpha_beta(board: &Board, depth: u8, mut alpha: i16, beta: i16) -> i16 {
     if depth == 0 {
         Evaluation::evaluate(board)
     } else {
@@ -53,7 +52,7 @@ fn null_alpha_beta(board: &Board, depth: usize, mut alpha: i16, beta: i16) -> i1
 fn cached_evaluation(
     trans_table: &TranspositionTable,
     board: &Board,
-    depth: usize,
+    depth: u8,
     value: &mut i16,
     alpha: &mut i16,
     beta: &mut i16,
@@ -61,16 +60,16 @@ fn cached_evaluation(
     match trans_table.get_evaluation(board) {
         None => None,
         Some(cached_eval) => {
-            if cached_eval.node_value.depth() >= depth {
-                *value = cached_eval.node_value.value();
-                match cached_eval.node_type {
-                    NodeType::PvNode => Some(cached_eval.node_value.value()),
+            if cached_eval.depth() >= depth {
+                *value = cached_eval.evaluation();
+                match cached_eval.node_type() {
+                    NodeType::PvNode => Some(cached_eval.evaluation()),
                     NodeType::AllNode => {
-                        *alpha = cmp::max(*alpha, cached_eval.node_value.value());
+                        *alpha = cmp::max(*alpha, cached_eval.evaluation());
                         None
                     }
                     NodeType::CutNode => {
-                        *beta = cmp::min(*beta, cached_eval.node_value.value());
+                        *beta = cmp::min(*beta, cached_eval.evaluation());
                         None
                     }
                 }
@@ -81,230 +80,112 @@ fn cached_evaluation(
     }
 }
 
-struct Node {
-    hash: u64,
-    evaluation: Option<i16>,
-    chess_move: Option<ChessMove>,
-    children: Vec<Node>,
+fn expand(board: &Board) -> Vec<ChessMove> {
+    MOVE_SORTER.sorted_moves(board)
 }
 
-impl Default for Node {
-    fn default() -> Self {
-        Self {
-            hash: Board::default().get_hash(),
-            evaluation: None,
-            chess_move: None,
-            children: vec![],
-        }
+fn alpha_beta(
+    trans_table: &TranspositionTable,
+    board: &Board,
+    mut depth: u8,
+    mut alpha: i16,
+    mut beta: i16,
+) -> i16 {
+    if board.checkers().popcnt() > 0 && depth > 0 {
+        depth += 1;
     }
-}
+    let status = board.status();
+    let alpha_orig = alpha;
+    let mut value = Evaluation::MIN;
 
-impl Node {
-    fn new(board: Board, chess_move: Option<ChessMove>) -> Self {
-        Self {
-            hash: board.get_hash(),
-            evaluation: None,
-            chess_move,
-            children: vec![],
-        }
-    }
+    let cached_evaluation =
+        cached_evaluation(trans_table, board, depth, &mut value, &mut alpha, &mut beta);
 
-    fn best_move(&self) -> Option<ChessMove> {
-        self.children[0].chess_move
-    }
-
-    fn first_child(&mut self) -> Self {
-        self.children.remove(0)
-    }
-
-    fn find_child(&mut self, board: &Board) -> Option<Self> {
-        for i in 0..self.children.len() {
-            if self.children[i].hash == board.get_hash() {
-                return Some(self.children.remove(i));
+    if let Some(evaluation) = cached_evaluation {
+        evaluation
+    } else if status != BoardStatus::Ongoing {
+        Evaluation::evaluate(board)
+    } else if depth == 0 {
+        let value = q_search(board, alpha, beta);
+        trans_table.update_evaluation(board, CachedValue::new(depth, value, NodeType::PvNode));
+        value
+    } else {
+        if depth >= 3 {
+            if let Some(null_move_game) = board.null_move() {
+                let score = -null_alpha_beta(&null_move_game, depth - 3, -beta, -beta + 1);
+                if score >= beta {
+                    return beta;
+                }
             }
         }
-        None
-    }
-
-    fn is_expanded(&self) -> bool {
-        !self.children.is_empty()
-    }
-
-    fn expand(&mut self, board: &Board) {
-        if !self.is_expanded() {
-            let moves = MOVE_SORTER.sorted_moves(board);
-            for m in moves.into_iter() {
-                self.children
-                    .push(Node::new(board.make_move_new(m), Some(m)));
-            }
-        }
-    }
-
-    fn size(&self) -> usize {
-        let mut size = 1;
-        for i in 0..self.children.len() {
-            size += self.children[i].size();
-        }
-        size
-    }
-
-    fn sort_children_by_evaluation(&mut self) {
-        self.children
-            .sort_by(|a, b| match (a.evaluation, b.evaluation) {
-                (None, None) => Ordering::Equal,
-                (None, _) => Ordering::Greater,
-                (Some(_), None) => Ordering::Less,
-                (Some(a_val), Some(b_val)) => a_val.cmp(&b_val),
-            });
-    }
-
-    fn alpha_beta(
-        &mut self,
-        trans_table: &TranspositionTable,
-        board: &Board,
-        mut depth: usize,
-        mut alpha: i16,
-        mut beta: i16,
-    ) -> i16 {
-        if board.checkers().popcnt() > 0 && depth > 0 {
-            depth += 1;
-        }
-        let status = board.status();
-        let alpha_orig = alpha;
-        let mut value = Evaluation::MIN;
-        if depth > 0 {
-            self.expand(board);
-        }
-        let cached_evaluation =
-            cached_evaluation(trans_table, board, depth, &mut value, &mut alpha, &mut beta);
-        let value = if let Some(evaluation) = cached_evaluation {
-            evaluation
-        } else if status != BoardStatus::Ongoing {
-            Evaluation::evaluate(board)
-        } else if depth == 0 {
-            let value = q_search(board, alpha, beta);
-            trans_table.update_evaluation(
-                board,
-                CachedValue {
-                    node_type: NodeType::PvNode,
-                    node_value: NodeValue::new(board.get_hash(), depth, value, None),
-                },
+        let mut best_move = None;
+        for child_move in expand(board) {
+            let child_value = -alpha_beta(
+                trans_table,
+                &board.make_move_new(child_move),
+                depth - 1,
+                -beta,
+                -alpha,
             );
-            value
+            if child_value > value {
+                value = child_value;
+                best_move = Some(child_move);
+            }
+            value = cmp::max(child_value, value);
+            alpha = cmp::max(alpha, value);
+            if alpha >= beta {
+                break;
+            }
+        }
+        let cached_eval = if value <= alpha_orig {
+            // Beta
+            CachedValue::new(depth, value, NodeType::AllNode)
+        } else if value >= beta {
+            // Alpha
+            CachedValue::new(depth, value, NodeType::CutNode)
         } else {
-            if depth >= 3 {
-                if let Some(null_move_game) = board.null_move() {
-                    let score = -null_alpha_beta(&null_move_game, depth - 3, -beta, -beta + 1);
-                    if score >= beta {
-                        self.evaluation = Some(beta);
-                        return beta;
-                    }
-                }
-            }
-            for child_node in self.children.iter_mut() {
-                let child_move = child_node.chess_move.unwrap();
-
-                let child_value = -child_node.alpha_beta(
-                    trans_table,
-                    &board.make_move_new(child_move),
-                    depth - 1,
-                    -beta,
-                    -alpha,
-                );
-                value = cmp::max(child_value, value);
-                alpha = cmp::max(alpha, value);
-                if alpha >= beta {
-                    break;
-                }
-            }
-            self.sort_children_by_evaluation();
-            let cached_eval = if value <= alpha_orig {
-                // Beta
-                CachedValue {
-                    node_type: NodeType::AllNode,
-                    node_value: NodeValue::new(board.get_hash(), depth, value, None),
-                }
-            } else if value >= beta {
-                // Alpha
-                CachedValue {
-                    node_type: NodeType::CutNode,
-                    node_value: NodeValue::new(board.get_hash(), depth, value, None),
-                }
-            } else {
-                // Exact
-                CachedValue {
-                    node_type: NodeType::PvNode,
-                    node_value: NodeValue::new(board.get_hash(), depth, value, None),
-                }
-            };
-            trans_table.update_evaluation(board, cached_eval);
-            value
+            // Exact
+            CachedValue::new(depth, value, NodeType::PvNode)
         };
-        self.evaluation = Some(value);
+        trans_table.update_evaluation(board, cached_eval);
+        if let Some(best_move) = best_move {
+            trans_table.update_best_move(board, depth, best_move);
+        }
         value
     }
 }
 
 pub struct AlphaBetaChessAgent {
-    depth: usize,
-    evaluator: TranspositionTable,
-    head: RefCell<Option<Node>>,
+    depth: u8,
+    evaluator: Arc<TranspositionTable>,
 }
 
 impl AlphaBetaChessAgent {
-    pub fn new(depth: usize) -> Self {
+    pub fn new(depth: u8) -> Self {
         AlphaBetaChessAgent {
             depth,
-            evaluator: TranspositionTable::default(),
-            head: RefCell::new(Some(Node::default())),
+            evaluator: Arc::default(),
         }
-    }
-
-    fn size(&self) -> usize {
-        self.head.borrow().as_ref().unwrap().size()
-    }
-
-    fn update_position(&self, board: &Board) {
-        let head = self.head.borrow_mut().take();
-        let child = head.unwrap().find_child(board);
-        if child.is_some() {
-            self.update_head(child);
-        } else {
-            self.update_head(Some(Node::new(*board, None)));
-        }
-    }
-
-    fn update_head(&self, node: Option<Node>) {
-        let mut head = self.head.borrow_mut();
-        *head = node;
     }
 }
 
 impl ChessAgent for AlphaBetaChessAgent {
     fn get_action(&self, game: &Game) -> Action {
-        self.update_position(&game.current_position());
         let alpha = Evaluation::MIN;
         let beta = Evaluation::MAX;
-        let mut head = self.head.take().unwrap();
         for i in 1..=self.depth {
-            head.alpha_beta(&self.evaluator, &game.current_position(), i, alpha, beta);
-            println!(
-                "{} - {} = {}",
-                i,
-                &head.best_move().unwrap(),
-                head.evaluation.unwrap(),
-            );
+            alpha_beta(&self.evaluator, &game.current_position(), i, alpha, beta);
+            let best_move = self.evaluator.best_move(&game.current_position());
+            let evaluation = self
+                .evaluator
+                .get_shallow_evaluation(&game.current_position());
+            println!("{} - {} = {}", i, best_move.unwrap(), evaluation.unwrap());
         }
 
         // get best move
-        let best_move = head.best_move().unwrap();
-
-        // update head of tree
-        let first_child = head.first_child();
-        self.update_head(Some(first_child));
+        let best_move = self.evaluator.best_move(&game.current_position()).unwrap();
 
         println!("Best move: {}", best_move);
-        println!("Size: {}", self.size());
         Action::MakeMove(best_move)
     }
 }

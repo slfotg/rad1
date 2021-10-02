@@ -59,21 +59,20 @@ fn cached_evaluation(
     beta: &mut i16,
 ) -> Option<i16> {
     match trans_table.get_evaluation(board) {
-        CachedValue::Empty => None,
-        cached_eval => {
-            if cached_eval.depth() >= depth {
-                *value = cached_eval.value();
-                match cached_eval {
-                    CachedValue::Exact(_, _, evaluation) => Some(evaluation),
-                    CachedValue::Alpha(_, _, evaluation) => {
-                        *alpha = cmp::max(*alpha, evaluation);
+        None => None,
+        Some(cached_eval) => {
+            if cached_eval.node_value.depth() >= depth {
+                *value = cached_eval.node_value.value();
+                match cached_eval.node_type {
+                    NodeType::PvNode => Some(cached_eval.node_value.value()),
+                    NodeType::AllNode => {
+                        *alpha = cmp::max(*alpha, cached_eval.node_value.value());
                         None
                     }
-                    CachedValue::Beta(_, _, evaluation) => {
-                        *beta = cmp::max(*beta, evaluation);
+                    NodeType::CutNode => {
+                        *beta = cmp::min(*beta, cached_eval.node_value.value());
                         None
                     }
-                    _ => None,
                 }
             } else {
                 None
@@ -184,8 +183,13 @@ impl Node {
             Evaluation::evaluate(board)
         } else if depth == 0 {
             let value = q_search(board, alpha, beta);
-            trans_table
-                .update_evaluation(board, CachedValue::Exact(board.get_hash(), depth, value));
+            trans_table.update_evaluation(
+                board,
+                CachedValue {
+                    node_type: NodeType::PvNode,
+                    node_value: NodeValue::new(board.get_hash(), depth, value, None),
+                },
+            );
             value
         } else {
             if depth >= 3 {
@@ -215,11 +219,23 @@ impl Node {
             }
             self.sort_children_by_evaluation();
             let cached_eval = if value <= alpha_orig {
-                CachedValue::Beta(board.get_hash(), depth, value)
+                // Beta
+                CachedValue {
+                    node_type: NodeType::AllNode,
+                    node_value: NodeValue::new(board.get_hash(), depth, value, None),
+                }
             } else if value >= beta {
-                CachedValue::Alpha(board.get_hash(), depth, value)
+                // Alpha
+                CachedValue {
+                    node_type: NodeType::CutNode,
+                    node_value: NodeValue::new(board.get_hash(), depth, value, None),
+                }
             } else {
-                CachedValue::Exact(board.get_hash(), depth, value)
+                // Exact
+                CachedValue {
+                    node_type: NodeType::PvNode,
+                    node_value: NodeValue::new(board.get_hash(), depth, value, None),
+                }
             };
             trans_table.update_evaluation(board, cached_eval);
             value

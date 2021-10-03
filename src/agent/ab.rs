@@ -36,7 +36,7 @@ fn null_alpha_beta(board: &Board, depth: u8, mut alpha: i16, beta: i16) -> i16 {
     if depth == 0 {
         Evaluation::evaluate(board)
     } else {
-        for child_move in MOVE_SORTER.sorted_moves(board) {
+        for child_move in MOVE_SORTER.sorted_moves(board, None) {
             let val = -null_alpha_beta(&board.make_move_new(child_move), depth - 1, -beta, -alpha);
             if val >= beta {
                 return beta;
@@ -80,8 +80,8 @@ fn cached_evaluation(
     }
 }
 
-fn expand(board: &Board) -> Vec<ChessMove> {
-    MOVE_SORTER.sorted_moves(board)
+fn expand(trans_table: &TranspositionTable, board: &Board) -> Vec<ChessMove> {
+    MOVE_SORTER.sorted_moves(board, trans_table.best_move(board))
 }
 
 fn alpha_beta(
@@ -119,7 +119,7 @@ fn alpha_beta(
             }
         }
         let mut best_move = None;
-        for child_move in expand(board) {
+        for child_move in expand(trans_table, board) {
             let child_value = -alpha_beta(
                 trans_table,
                 &board.make_move_new(child_move),
@@ -131,7 +131,6 @@ fn alpha_beta(
                 value = child_value;
                 best_move = Some(child_move);
             }
-            value = cmp::max(child_value, value);
             alpha = cmp::max(alpha, value);
             if alpha >= beta {
                 break;

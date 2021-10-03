@@ -7,10 +7,20 @@ pub const MOVE_SORTER: MoveSorter = MoveSorter;
 
 impl MoveSorter {
     #[inline]
-    pub fn sorted_moves(&self, board: &Board) -> Vec<ChessMove> {
+    pub fn sorted_moves(&self, board: &Board, best_move: Option<ChessMove>) -> Vec<ChessMove> {
+        let mut sorted_moves = Vec::new();
+        let mut move_gen = MoveGen::new_legal(board);
+        if let Some(best_move) = best_move {
+            if board.legal(best_move) {
+                move_gen.remove_move(best_move);
+                sorted_moves.push(best_move);
+            }
+        }
         let mut moves = MoveGen::new_legal(board).collect::<Vec<ChessMove>>();
         moves.sort_by(|a, b| self.compare_moves(board, a, b));
-        moves
+        //moves
+        sorted_moves.append(&mut moves);
+        sorted_moves
     }
 
     #[inline]

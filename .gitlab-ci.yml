@@ -1,13 +1,16 @@
+default:
+  image: rust:1.55
+  tags:
+    - rad1
+
 stages:
   - build
   - test
   - code-quality
+  - deploy
 
 cargo-build:
   stage: build
-  image: rust:1.55
-  tags:
-    - rad1
   script:
     - cargo build --release --verbose
   artifacts:
@@ -17,17 +20,11 @@ cargo-build:
 
 cargo-test:
   stage: test
-  image: rust:1.55
-  tags:
-    - rad1
   script:
     - cargo test --verbose
 
 check-formatting:
   stage: code-quality
-  image: rust:1.55
-  tags:
-    - rad1
   before_script:
     - rustup component add rustfmt
   script:
@@ -35,10 +32,21 @@ check-formatting:
 
 lint:
   stage: code-quality
-  image: rust:1.55
-  tags:
-    - rad1
   before_script:
     - rustup component add clippy
   script:
     - cargo clippy -- -D warnings
+
+pages:
+  stage: deploy
+  script:
+    - cargo doc --no-deps --release
+  after_script:
+    - cp -R target/doc public
+    - echo "/rad1/index.html /rad1/rad1/index.html 302\n/rad1/ /rad1/rad1/ 302" > public/_redirects
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+

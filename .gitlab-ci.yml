@@ -2,6 +2,13 @@ default:
   image: rust:1.55
   tags:
     - rad1
+  cache:
+    - Cargo.lock
+    - target/
+    - /cache/cargo/
+
+variables:
+  CARGO_HOME: "/cache/cargo/"
 
 stages:
   - build

@@ -3,9 +3,11 @@ default:
   tags:
     - rad1
   cache:
-    - Cargo.lock
-    - target/
-    - /cache/cargo/
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+      - Cargo.lock
+      - target/
+      - /cache/cargo/
 
 variables:
   CARGO_HOME: "/cache/cargo/"

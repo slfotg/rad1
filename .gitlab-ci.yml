@@ -7,10 +7,10 @@ default:
     paths:
       - Cargo.lock
       - target/
-      - /cache/cargo/
+      - .cargo/
 
 variables:
-  CARGO_HOME: "/cache/cargo/"
+  CARGO_HOME: "${CI_PROJECT_DIR}/.cargo/"
 
 stages:
   - build

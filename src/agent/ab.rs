@@ -84,16 +84,23 @@ fn expand(trans_table: &TranspositionTable, board: &Board) -> Vec<ChessMove> {
     MOVE_SORTER.sorted_moves(board, trans_table.best_move(board))
 }
 
+fn check_extension(board: &Board, depth: &mut u8, check_extension_enabled: &mut bool) {
+    if *check_extension_enabled && board.checkers().popcnt() > 0 {
+        *depth += 1;
+        // only allow one check extension in a search path
+        *check_extension_enabled = false;
+    }
+}
+
 fn alpha_beta(
     trans_table: &TranspositionTable,
     board: &Board,
     mut depth: u8,
     mut alpha: i16,
     mut beta: i16,
+    mut check_extension_enabled: bool,
 ) -> i16 {
-    if board.checkers().popcnt() > 0 && depth > 0 {
-        depth += 1;
-    }
+    check_extension(board, &mut depth, &mut check_extension_enabled);
     let status = board.status();
     let alpha_orig = alpha;
     let mut value = Evaluation::MIN;
@@ -126,6 +133,7 @@ fn alpha_beta(
                 depth - 1,
                 -beta,
                 -alpha,
+                check_extension_enabled,
             );
             if child_value > value {
                 value = child_value;
@@ -173,7 +181,14 @@ impl ChessAgent for AlphaBetaChessAgent {
         let alpha = Evaluation::MIN;
         let beta = Evaluation::MAX;
         for i in 1..=self.depth {
-            alpha_beta(&self.evaluator, &game.current_position(), i, alpha, beta);
+            alpha_beta(
+                &self.evaluator,
+                &game.current_position(),
+                i,
+                alpha,
+                beta,
+                true,
+            );
             let best_move = self.evaluator.best_move(&game.current_position());
             let evaluation = self
                 .evaluator

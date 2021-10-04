@@ -2,6 +2,7 @@ stages:
   - build
   - test
   - code-quality
+  - deploy
 
 cargo-build:
   stage: build
@@ -42,3 +43,20 @@ lint:
     - rustup component add clippy
   script:
     - cargo clippy -- -D warnings
+
+pages:
+  stage: deploy
+  image: rust:1.55
+  tags:
+    - rad1
+  script:
+    - cargo doc --no-deps --release
+  after_script:
+    - cp -R target/doc public
+    - echo "/rad1/index.html /rad1/rad1/index.html 302\n/rad1/ /rad1/rad1/ 302" > public/_redirects
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+

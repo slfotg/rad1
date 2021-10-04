@@ -165,6 +165,6 @@ mod tests {
         let chess_move = ChessMove::new(Square::E2, Square::E4, None);
         let board = board.make_move_new(chess_move);
         let evaluation = Evaluation::evaluate(&board);
-        assert_eq!(evaluation, -2);
+        assert_eq!(evaluation, -3);
     }
 }

@@ -1,3 +1,8 @@
+default:
+  image: rust:1.55
+  tags:
+    - rad1
+
 stages:
   - build
   - test
@@ -6,9 +11,6 @@ stages:
 
 cargo-build:
   stage: build
-  image: rust:1.55
-  tags:
-    - rad1
   script:
     - cargo build --release --verbose
   artifacts:
@@ -18,17 +20,11 @@ cargo-build:
 
 cargo-test:
   stage: test
-  image: rust:1.55
-  tags:
-    - rad1
   script:
     - cargo test --verbose
 
 check-formatting:
   stage: code-quality
-  image: rust:1.55
-  tags:
-    - rad1
   before_script:
     - rustup component add rustfmt
   script:
@@ -36,9 +32,6 @@ check-formatting:
 
 lint:
   stage: code-quality
-  image: rust:1.55
-  tags:
-    - rad1
   before_script:
     - rustup component add clippy
   script:
@@ -46,9 +39,6 @@ lint:
 
 pages:
   stage: deploy
-  image: rust:1.55
-  tags:
-    - rad1
   script:
     - cargo doc --no-deps --release
   after_script:

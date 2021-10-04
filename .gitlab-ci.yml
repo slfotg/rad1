@@ -43,7 +43,8 @@ pages:
     - cargo doc --no-deps --release
   after_script:
     - cp -R target/doc public
-    - echo "/rad1/index.html /rad1/rad1/index.html 302\n/rad1/ /rad1/rad1/ 302" > public/_redirects
+    - echo "/rad1/index.html /rad1/rad1/index.html 302" >> public/_redirects
+    - echo "/rad1/ /rad1/rad1/ 302" >> public/_redirects
   artifacts:
     paths:
       - public

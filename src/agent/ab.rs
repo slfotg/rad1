@@ -53,7 +53,6 @@ fn cached_evaluation(
     trans_table: &TranspositionTable,
     board: &Board,
     depth: u8,
-    value: &mut i16,
     alpha: &mut i16,
     beta: &mut i16,
 ) -> Option<i16> {
@@ -61,15 +60,15 @@ fn cached_evaluation(
         None => None,
         Some(cached_eval) => {
             if cached_eval.depth() >= depth {
-                *value = cached_eval.evaluation();
+                let value = cached_eval.evaluation();
                 match cached_eval.node_type() {
-                    NodeType::PvNode => Some(cached_eval.evaluation()),
+                    NodeType::PvNode => Some(value),
                     NodeType::AllNode => {
-                        *alpha = cmp::max(*alpha, cached_eval.evaluation());
+                        *alpha = cmp::max(*alpha, value);
                         None
                     }
                     NodeType::CutNode => {
-                        *beta = cmp::min(*beta, cached_eval.evaluation());
+                        *beta = cmp::min(*beta, value);
                         None
                     }
                 }
@@ -103,10 +102,8 @@ fn alpha_beta(
     check_extension(board, &mut depth, &mut check_extension_enabled);
     let status = board.status();
     let alpha_orig = alpha;
-    let mut value = Evaluation::MIN;
 
-    let cached_evaluation =
-        cached_evaluation(trans_table, board, depth, &mut value, &mut alpha, &mut beta);
+    let cached_evaluation = cached_evaluation(trans_table, board, depth, &mut alpha, &mut beta);
 
     if let Some(evaluation) = cached_evaluation {
         evaluation
@@ -158,30 +155,29 @@ fn alpha_beta(
                     child_value
                 }
             };
-            if child_value > value {
-                value = child_value;
+            if child_value > alpha {
+                alpha = child_value;
                 best_move = Some(child_move);
             }
-            alpha = cmp::max(alpha, value);
             if alpha >= beta {
                 break;
             }
         }
-        let cached_eval = if value <= alpha_orig {
+        let cached_eval = if alpha <= alpha_orig {
             // Beta
-            CachedValue::new(depth, value, NodeType::AllNode)
-        } else if value >= beta {
+            CachedValue::new(depth, alpha, NodeType::AllNode)
+        } else if alpha >= beta {
             // Alpha
-            CachedValue::new(depth, value, NodeType::CutNode)
+            CachedValue::new(depth, alpha, NodeType::CutNode)
         } else {
             // Exact
-            CachedValue::new(depth, value, NodeType::PvNode)
+            CachedValue::new(depth, alpha, NodeType::PvNode)
         };
         trans_table.update_evaluation(board, cached_eval);
         if let Some(best_move) = best_move {
             trans_table.update_best_move(board, depth, best_move);
         }
-        value
+        alpha
     }
 }
 

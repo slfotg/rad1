@@ -79,6 +79,29 @@ fn cached_evaluation(
     }
 }
 
+fn update_cache(
+    trans_table: &TranspositionTable,
+    board: &Board,
+    depth: u8,
+    alpha: i16,
+    beta: i16,
+    value: i16,
+    best_move: ChessMove,
+) {
+    let cached_eval = if value <= alpha {
+        // Beta
+        CachedValue::new(depth, value, NodeType::AllNode)
+    } else if value >= beta {
+        // Alpha
+        CachedValue::new(depth, value, NodeType::CutNode)
+    } else {
+        // Exact
+        CachedValue::new(depth, value, NodeType::PvNode)
+    };
+    trans_table.update_evaluation(board, cached_eval);
+    trans_table.update_best_move(board, depth, best_move);
+}
+
 fn expand(trans_table: &TranspositionTable, board: &Board) -> Vec<ChessMove> {
     MOVE_SORTER.sorted_moves(board, trans_table.best_move(board))
 }
@@ -102,7 +125,8 @@ fn principal_variation_search(
     let moves = expand(trans_table, board);
     let mut best_move = moves[0];
     for (i, &child_move) in moves.iter().enumerate() {
-        let child_value = if i == 0 {
+        // Search down the principal variation path first with regular window
+        let value = if i == 0 {
             -alpha_beta(
                 trans_table,
                 &board.make_move_new(child_move),
@@ -112,7 +136,8 @@ fn principal_variation_search(
                 check_extension_enabled,
             )
         } else {
-            let child_value = -alpha_beta(
+            // Search the rest of the paths with null windows
+            let value = -alpha_beta(
                 trans_table,
                 &board.make_move_new(child_move),
                 depth - 1,
@@ -120,7 +145,8 @@ fn principal_variation_search(
                 -alpha,
                 check_extension_enabled,
             );
-            if alpha < child_value && child_value < beta {
+            // Re-search a path if we find a better move
+            if alpha < value && value < beta {
                 -alpha_beta(
                     trans_table,
                     &board.make_move_new(child_move),
@@ -130,11 +156,11 @@ fn principal_variation_search(
                     check_extension_enabled,
                 )
             } else {
-                child_value
+                value
             }
         };
-        if child_value > alpha {
-            alpha = child_value;
+        if value > alpha {
+            alpha = value;
             best_move = child_move;
         }
         if alpha >= beta {
@@ -156,47 +182,56 @@ fn alpha_beta(
     let status = board.status();
     let alpha_orig = alpha;
 
+    // Get cached evaluation if it exists and update alpha/beta accordingly
+    // If an exact value is already cached, return that immediately
     let cached_evaluation = cached_evaluation(trans_table, board, depth, &mut alpha, &mut beta);
+    if cached_evaluation.is_some() {
+        return cached_evaluation.unwrap();
+    }
 
-    if let Some(evaluation) = cached_evaluation {
-        evaluation
-    } else if status != BoardStatus::Ongoing {
-        Evaluation::evaluate(board)
-    } else if depth == 0 {
+    // If game is over, return evaluation
+    if status != BoardStatus::Ongoing {
+        return Evaluation::evaluate(board);
+    }
+
+    // If depth is 0, evaluate after quiesence search, cache and return
+    if depth == 0 {
         let value = q_search(board, alpha, beta);
         trans_table.update_evaluation(board, CachedValue::new(depth, value, NodeType::PvNode));
-        value
-    } else {
-        if depth >= 3 {
-            if let Some(null_move_game) = board.null_move() {
-                let score = -null_alpha_beta(&null_move_game, depth - 3, -beta, -beta + 1);
-                if score >= beta {
-                    return beta;
-                }
+        return value;
+    }
+
+    // depth >= 3, try null-move pruning
+    if depth >= 3 {
+        if let Some(null_move_game) = board.null_move() {
+            let score = -null_alpha_beta(&null_move_game, depth - 3, -beta, -beta + 1);
+            if score >= beta {
+                return beta;
             }
         }
-        let (value, best_move) = principal_variation_search(
-            trans_table,
-            board,
-            depth,
-            alpha,
-            beta,
-            check_extension_enabled,
-        );
-        let cached_eval = if value <= alpha_orig {
-            // Beta
-            CachedValue::new(depth, value, NodeType::AllNode)
-        } else if value >= beta {
-            // Alpha
-            CachedValue::new(depth, value, NodeType::CutNode)
-        } else {
-            // Exact
-            CachedValue::new(depth, value, NodeType::PvNode)
-        };
-        trans_table.update_evaluation(board, cached_eval);
-        trans_table.update_best_move(board, depth, best_move);
-        value
     }
+
+    // perform principal search
+    let (value, best_move) = principal_variation_search(
+        trans_table,
+        board,
+        depth,
+        alpha,
+        beta,
+        check_extension_enabled,
+    );
+
+    // update value/best_move in transpostion tables
+    update_cache(
+        trans_table,
+        board,
+        depth,
+        alpha_orig,
+        beta,
+        value,
+        best_move,
+    );
+    value
 }
 
 pub struct AlphaBetaChessAgent {

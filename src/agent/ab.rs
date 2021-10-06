@@ -91,6 +91,59 @@ fn check_extension(board: &Board, depth: &mut u8, check_extension_enabled: &mut 
     }
 }
 
+fn principal_variation_search(
+    trans_table: &TranspositionTable,
+    board: &Board,
+    depth: u8,
+    mut alpha: i16,
+    beta: i16,
+    check_extension_enabled: bool,
+) -> (i16, ChessMove) {
+    let moves = expand(trans_table, board);
+    let mut best_move = moves[0];
+    for (i, &child_move) in moves.iter().enumerate() {
+        let child_value = if i == 0 {
+            -alpha_beta(
+                trans_table,
+                &board.make_move_new(child_move),
+                depth - 1,
+                -beta,
+                -alpha,
+                check_extension_enabled,
+            )
+        } else {
+            let child_value = -alpha_beta(
+                trans_table,
+                &board.make_move_new(child_move),
+                depth - 1,
+                -alpha - 1,
+                -alpha,
+                check_extension_enabled,
+            );
+            if alpha < child_value && child_value < beta {
+                -alpha_beta(
+                    trans_table,
+                    &board.make_move_new(child_move),
+                    depth - 1,
+                    -beta,
+                    -alpha,
+                    check_extension_enabled,
+                )
+            } else {
+                child_value
+            }
+        };
+        if child_value > alpha {
+            alpha = child_value;
+            best_move = child_move;
+        }
+        if alpha >= beta {
+            break;
+        }
+    }
+    (alpha, best_move)
+}
+
 fn alpha_beta(
     trans_table: &TranspositionTable,
     board: &Board,
@@ -122,62 +175,27 @@ fn alpha_beta(
                 }
             }
         }
-        let mut best_move = None;
-        for (i, &child_move) in expand(trans_table, board).iter().enumerate() {
-            let child_value = if i == 0 {
-                -alpha_beta(
-                    trans_table,
-                    &board.make_move_new(child_move),
-                    depth - 1,
-                    -beta,
-                    -alpha,
-                    check_extension_enabled,
-                )
-            } else {
-                let child_value = -alpha_beta(
-                    trans_table,
-                    &board.make_move_new(child_move),
-                    depth - 1,
-                    -alpha - 1,
-                    -alpha,
-                    check_extension_enabled,
-                );
-                if alpha < child_value && child_value < beta {
-                    -alpha_beta(
-                        trans_table,
-                        &board.make_move_new(child_move),
-                        depth - 1,
-                        -beta,
-                        -alpha,
-                        check_extension_enabled,
-                    )
-                } else {
-                    child_value
-                }
-            };
-            if child_value > alpha {
-                alpha = child_value;
-                best_move = Some(child_move);
-            }
-            if alpha >= beta {
-                break;
-            }
-        }
-        let cached_eval = if alpha <= alpha_orig {
+        let (value, best_move) = principal_variation_search(
+            trans_table,
+            board,
+            depth,
+            alpha,
+            beta,
+            check_extension_enabled,
+        );
+        let cached_eval = if value <= alpha_orig {
             // Beta
-            CachedValue::new(depth, alpha, NodeType::AllNode)
-        } else if alpha >= beta {
+            CachedValue::new(depth, value, NodeType::AllNode)
+        } else if value >= beta {
             // Alpha
-            CachedValue::new(depth, alpha, NodeType::CutNode)
+            CachedValue::new(depth, value, NodeType::CutNode)
         } else {
             // Exact
-            CachedValue::new(depth, alpha, NodeType::PvNode)
+            CachedValue::new(depth, value, NodeType::PvNode)
         };
         trans_table.update_evaluation(board, cached_eval);
-        if let Some(best_move) = best_move {
-            trans_table.update_best_move(board, depth, best_move);
-        }
-        alpha
+        trans_table.update_best_move(board, depth, best_move);
+        value
     }
 }
 

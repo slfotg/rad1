@@ -126,15 +126,38 @@ fn alpha_beta(
             }
         }
         let mut best_move = None;
-        for child_move in expand(trans_table, board) {
-            let child_value = -alpha_beta(
-                trans_table,
-                &board.make_move_new(child_move),
-                depth - 1,
-                -beta,
-                -alpha,
-                check_extension_enabled,
-            );
+        for (i, &child_move) in expand(trans_table, board).iter().enumerate() {
+            let child_value = if i == 0 {
+                -alpha_beta(
+                    trans_table,
+                    &board.make_move_new(child_move),
+                    depth - 1,
+                    -beta,
+                    -alpha,
+                    check_extension_enabled,
+                )
+            } else {
+                let child_value = -alpha_beta(
+                    trans_table,
+                    &board.make_move_new(child_move),
+                    depth - 1,
+                    -alpha - 1,
+                    -alpha,
+                    check_extension_enabled,
+                );
+                if alpha < child_value && child_value < beta {
+                    -alpha_beta(
+                        trans_table,
+                        &board.make_move_new(child_move),
+                        depth - 1,
+                        -beta,
+                        -alpha,
+                        check_extension_enabled,
+                    )
+                } else {
+                    child_value
+                }
+            };
             if child_value > value {
                 value = child_value;
                 best_move = Some(child_move);
@@ -180,6 +203,7 @@ impl ChessAgent for AlphaBetaChessAgent {
     fn get_action(&self, game: &Game) -> Action {
         let alpha = Evaluation::MIN;
         let beta = Evaluation::MAX;
+
         for i in 1..=self.depth {
             alpha_beta(
                 &self.evaluator,

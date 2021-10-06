@@ -114,6 +114,38 @@ fn check_extension(board: &Board, depth: &mut u8, check_extension_enabled: &mut 
     }
 }
 
+fn null_window_search(
+    trans_table: &TranspositionTable,
+    board: &Board,
+    depth: u8,
+    alpha: i16,
+    beta: i16,
+    check_extension_enabled: bool,
+) -> i16 {
+    // Search with null window at first
+    let value = -alpha_beta(
+        trans_table,
+        &board,
+        depth - 1,
+        -alpha - 1,
+        -alpha,
+        check_extension_enabled,
+    );
+    // Re-search the path with regular window if alpha < value < beta
+    if alpha < value && value < beta {
+        -alpha_beta(
+            trans_table,
+            &board,
+            depth - 1,
+            -beta,
+            -alpha,
+            check_extension_enabled,
+        )
+    } else {
+        value
+    }
+}
+
 fn principal_variation_search(
     trans_table: &TranspositionTable,
     board: &Board,
@@ -125,8 +157,8 @@ fn principal_variation_search(
     let moves = expand(trans_table, board);
     let mut best_move = moves[0];
     for (i, &child_move) in moves.iter().enumerate() {
-        // Search down the principal variation path first with regular window
         let value = if i == 0 {
+            // Search down the principal variation path first with regular window
             -alpha_beta(
                 trans_table,
                 &board.make_move_new(child_move),
@@ -137,27 +169,14 @@ fn principal_variation_search(
             )
         } else {
             // Search the rest of the paths with null windows
-            let value = -alpha_beta(
+            null_window_search(
                 trans_table,
                 &board.make_move_new(child_move),
-                depth - 1,
-                -alpha - 1,
-                -alpha,
+                depth,
+                alpha,
+                beta,
                 check_extension_enabled,
-            );
-            // Re-search a path if we find a better move
-            if alpha < value && value < beta {
-                -alpha_beta(
-                    trans_table,
-                    &board.make_move_new(child_move),
-                    depth - 1,
-                    -beta,
-                    -alpha,
-                    check_extension_enabled,
-                )
-            } else {
-                value
-            }
+            )
         };
         if value > alpha {
             alpha = value;

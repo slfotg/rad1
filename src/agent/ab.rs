@@ -125,7 +125,7 @@ fn null_window_search(
     // Search with null window at first
     let value = -alpha_beta(
         trans_table,
-        &board,
+        board,
         depth - 1,
         -alpha - 1,
         -alpha,
@@ -135,7 +135,7 @@ fn null_window_search(
     if alpha < value && value < beta {
         -alpha_beta(
             trans_table,
-            &board,
+            board,
             depth - 1,
             -beta,
             -alpha,
@@ -203,9 +203,8 @@ fn alpha_beta(
 
     // Get cached evaluation if it exists and update alpha/beta accordingly
     // If an exact value is already cached, return that immediately
-    let cached_evaluation = cached_evaluation(trans_table, board, depth, &mut alpha, &mut beta);
-    if cached_evaluation.is_some() {
-        return cached_evaluation.unwrap();
+    if let Some(value) = cached_evaluation(trans_table, board, depth, &mut alpha, &mut beta) {
+        return value;
     }
 
     // If game is over, return evaluation

@@ -156,28 +156,33 @@ fn principal_variation_search(
 ) -> (i16, ChessMove) {
     let moves = expand(trans_table, board);
     let mut best_move = moves[0];
-    for (i, &child_move) in moves.iter().enumerate() {
-        let value = if i == 0 {
-            // Search down the principal variation path first with regular window
-            -alpha_beta(
-                trans_table,
-                &board.make_move_new(child_move),
-                depth - 1,
-                -beta,
-                -alpha,
-                check_extension_enabled,
-            )
-        } else {
-            // Search the rest of the paths with null windows
-            null_window_search(
-                trans_table,
-                &board.make_move_new(child_move),
-                depth,
-                alpha,
-                beta,
-                check_extension_enabled,
-            )
-        };
+
+    // Search down the principal variation path first with regular window
+    let value = -alpha_beta(
+        trans_table,
+        &board.make_move_new(moves[0]),
+        depth - 1,
+        -beta,
+        -alpha,
+        check_extension_enabled,
+    );
+    if value > alpha {
+        alpha = value;
+    }
+    if alpha >= beta {
+        return (alpha, best_move);
+    }
+
+    // Search the rest of the paths with null windows
+    for &child_move in moves.iter().skip(1) {
+        let value = null_window_search(
+            trans_table,
+            &board.make_move_new(child_move),
+            depth,
+            alpha,
+            beta,
+            check_extension_enabled,
+        );
         if value > alpha {
             alpha = value;
             best_move = child_move;

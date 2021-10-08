@@ -5,6 +5,7 @@ use crate::tt::*;
 use chess::{Action, Board, BoardStatus, ChessMove, Game};
 use std::cmp;
 use std::sync::Arc;
+use tokio::runtime::Runtime;
 
 // quiescence search
 fn q_search(board: &Board, mut alpha: i16, beta: i16) -> i16 {
@@ -60,13 +61,17 @@ fn check_extension(board: &Board, depth: &mut u8, check_extension_enabled: &mut 
 pub struct AlphaBetaChessAgent {
     depth: u8,
     evaluator: Arc<TranspositionTable>,
+    runtime: Runtime,
 }
 
 impl AlphaBetaChessAgent {
     pub fn new(depth: u8) -> Self {
+        let runtime = Runtime::new().unwrap();
+        let evaluator = Arc::default();
         AlphaBetaChessAgent {
             depth,
-            evaluator: Arc::default(),
+            evaluator,
+            runtime,
         }
     }
 
@@ -109,18 +114,22 @@ impl AlphaBetaChessAgent {
         value: i16,
         best_move: ChessMove,
     ) {
-        let cached_eval = if value <= alpha {
-            // Beta
-            CachedValue::new(depth, value, NodeType::AllNode)
-        } else if value >= beta {
-            // Alpha
-            CachedValue::new(depth, value, NodeType::CutNode)
-        } else {
-            // Exact
-            CachedValue::new(depth, value, NodeType::PvNode)
-        };
-        self.evaluator.update_evaluation(board, cached_eval);
-        self.evaluator.update_best_move(board, depth, best_move);
+        let tt = Arc::clone(&self.evaluator);
+        let board = board.clone();
+        self.runtime.spawn(async move {
+            let cached_eval = if value <= alpha {
+                // Beta
+                CachedValue::new(depth, value, NodeType::AllNode)
+            } else if value >= beta {
+                // Alpha
+                CachedValue::new(depth, value, NodeType::CutNode)
+            } else {
+                // Exact
+                CachedValue::new(depth, value, NodeType::PvNode)
+            };
+            tt.update_evaluation(&board, cached_eval);
+            tt.update_best_move(&board, depth, best_move);
+        });
     }
 
     fn expand(&self, board: &Board) -> Vec<ChessMove> {
@@ -253,7 +262,7 @@ impl ChessAgent for AlphaBetaChessAgent {
             let evaluation = self
                 .evaluator
                 .get_shallow_evaluation(&game.current_position());
-            println!("{} - {} = {}", i, best_move.unwrap(), evaluation.unwrap());
+            println!("{} - {:?} = {:?}", i, best_move, evaluation);
         }
 
         // get best move

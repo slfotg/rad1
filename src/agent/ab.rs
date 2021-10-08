@@ -115,7 +115,7 @@ impl AlphaBetaChessAgent {
         best_move: ChessMove,
     ) {
         let tt = Arc::clone(&self.evaluator);
-        let board = board.clone();
+        let board = *board;
         self.runtime.spawn(async move {
             let cached_eval = if value <= alpha {
                 // Beta

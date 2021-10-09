@@ -12,20 +12,6 @@ cache:
 variables:
   CARGO_HOME: "${CI_PROJECT_DIR}/.cargo/"
   CARGO_TERM_VERBOSE: "true"
-  FLAGS: ""
-  DEPLOY_RELEASE:
-    value: "false"
-    description: "Create a release build. Value can be 'true' or 'false' (default)"
-
-workflow:
-  rules:
-    # Commit Tags are always release
-    - if: $DEPLOY_RELEASE == "false" && $CI_COMMIT_TAG != ""
-      variables:
-        DEPLOY_RELEASE: "true"
-    - if: $DEPLOY_RELEASE == "true" || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      variables:
-        FLAGS: "--release"
 
 stages:
   - build
@@ -36,7 +22,7 @@ stages:
 cargo-build:
   stage: build
   script:
-    - cargo build $FLAGS
+    - cargo build --release
   artifacts:
     paths:
       - target/release/rad1-cli
@@ -45,7 +31,7 @@ cargo-build:
 cargo-test:
   stage: test
   script:
-    - cargo test $FLAGS
+    - cargo test --release
 
 check-formatting:
   stage: code-quality
@@ -73,4 +59,4 @@ pages:
     paths:
       - public
   rules:
-    - if: $DEPLOY_RELEASE == "true"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

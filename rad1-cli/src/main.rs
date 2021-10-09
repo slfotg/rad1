@@ -1,33 +1,27 @@
 use clap::{App, AppSettings};
 
 mod command;
-use command::Command;
+
+use command::analyze;
+use command::play;
 
 fn main() {
-    let analyze_command = command::analyze();
-    let play_command = command::play();
-    let matches = App::new("Rad1 Chess Engine")
+    let analyze_app = analyze::analyze_app();
+    let play_app = play::play_app();
+    let matches = App::new("Rad1 Chess Engine CLI")
+        .version(env!("CARGO_PKG_VERSION"))
+        .author(env!("CARGO_PKG_AUTHORS"))
+        .about(env!("CARGO_PKG_DESCRIPTION"))
         .setting(AppSettings::SubcommandRequired)
-        .version("0.2.0")
-        .author("Sam Foster <slfotg@gmail.com>")
-        .about("A Simple Chess Engine in Rust")
-        .subcommand(play_command.options())
-        .subcommand(analyze_command.options())
+        .subcommand(analyze_app)
+        .subcommand(play_app)
         .get_matches();
 
     if let Some(subcommand) = matches.subcommand_name() {
-        if subcommand == analyze_command.command_name() {
-            analyze_command.exec(
-                matches
-                    .subcommand_matches(analyze_command.command_name())
-                    .unwrap(),
-            );
+        if subcommand == "analyze" {
+            analyze::exec(matches.subcommand_matches("analyze").unwrap());
         } else {
-            play_command.exec(
-                matches
-                    .subcommand_matches(play_command.command_name())
-                    .unwrap(),
-            );
+            play::exec(matches.subcommand_matches("play").unwrap());
         }
     }
 }

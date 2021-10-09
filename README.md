@@ -55,7 +55,7 @@ Help:
     A Simple Chess Engine in Rust
 
     USAGE:
-        rad1 <SUBCOMMAND>
+        rad1-cli <SUBCOMMAND>
 
     FLAGS:
         -h, --help       Prints help information

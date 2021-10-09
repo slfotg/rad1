@@ -2,6 +2,7 @@
 name = "rad1-cli"
 version = "0.2.1"
 authors = ["Sam Foster <slfotg@gmail.com>"]
+description = "Command line interface for rad1 chess engine"
 edition = "2018"
 
 [dependencies]
@@ -10,3 +11,6 @@ chess = "3.2.0"
 clap = "2.33.3"
 itertools = "0.10.1"
 rad1 = { version = "0.2.1", path = "../rad1" }
+
+[dev-dependencies]
+version-sync = "0.9"

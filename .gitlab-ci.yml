@@ -11,7 +11,7 @@ cache:
 
 variables:
   CARGO_HOME: "${CI_PROJECT_DIR}/.cargo/"
-  CARGO_TERM_VERBOSE: true
+  CARGO_TERM_VERBOSE: "true"
 
 stages:
   - build

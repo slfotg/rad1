@@ -12,6 +12,11 @@ cache:
 variables:
   CARGO_HOME: "${CI_PROJECT_DIR}/.cargo/"
   CARGO_TERM_VERBOSE: "true"
+  DEPLOY_RELEASE:
+    value: "false"
+    description: "Create a release build. Value can be 'true' or 'false' (default)"
+  BUILD_FLAGS:
+    value: ""
 
 stages:
   - build
@@ -60,4 +65,3 @@ pages:
       - public
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-

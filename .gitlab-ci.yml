@@ -2,15 +2,16 @@ default:
   image: rust:1.55
   tags:
     - rad1
-  cache:
-    key: "$CI_COMMIT_REF_SLUG"
-    paths:
-      - Cargo.lock
-      - target/
-      - .cargo/
+
+cache:
+  paths:
+    - Cargo.lock
+    - target/
+    - .cargo/
 
 variables:
   CARGO_HOME: "${CI_PROJECT_DIR}/.cargo/"
+  CARGO_TERM_VERBOSE: "true"
 
 stages:
   - build
@@ -21,16 +22,16 @@ stages:
 cargo-build:
   stage: build
   script:
-    - cargo build --release --verbose
+    - cargo build --release
   artifacts:
     paths:
-      - target/release/rad1
+      - target/release/rad1-cli
     expire_in: 1 week
 
 cargo-test:
   stage: test
   script:
-    - cargo test --verbose
+    - cargo test --release
 
 check-formatting:
   stage: code-quality
@@ -59,4 +60,3 @@ pages:
       - public
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-

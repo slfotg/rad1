@@ -49,13 +49,13 @@ It's better to build a release version of the code instead of just using `cargo 
 
 Help:
 
-    ❯ ./target/release/rad1 --help
+    ❯ ./target/release/rad1-cli --help
     Rad1 Chess Engine 0.2.1
     Sam Foster <slfotg@gmail.com>
     A Simple Chess Engine in Rust
 
     USAGE:
-        rad1 <SUBCOMMAND>
+        rad1-cli <SUBCOMMAND>
 
     FLAGS:
         -h, --help       Prints help information
@@ -68,11 +68,11 @@ Help:
 
 To play against the engine in the terminal:
 
-    ❯ ./target/release/rad1 play
+    ❯ ./target/release/rad1-cli play
 
 To evaluate a specific position from a FEN representation
 
-    ❯ ./target/release/rad1 analyze --fen "r3k2r/1p3pp1/p1p4p/3pP3/1PP5/P2P1P2/2qnKQ1P/8 b kq - 7 28"
+    ❯ ./target/release/rad1-cli analyze --fen "r3k2r/1p3pp1/p1p4p/3pP3/1PP5/P2P1P2/2qnKQ1P/8 b kq - 7 28"
     1 - d2c4 = 145
     2 - d2e4 = 224
     3 - d2e4 = 234

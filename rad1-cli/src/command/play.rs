@@ -1,75 +1,65 @@
-use super::Command;
-use crate::agent;
-use crate::agent::ChessAgent;
 use ansi_term::Colour;
 use ansi_term::Style;
 use chess::{Action, Board, Color, Game, Piece, Rank, Square};
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches};
 use itertools::Either;
+use rad1::agent;
+use rad1::agent::ChessAgent;
 use std::str::FromStr;
 
-const COMMAND_NAME: &str = "play";
+pub const COMMAND_NAME: &str = "play";
 
-#[derive(Default)]
-pub struct PlayCommand;
+pub fn play_app() -> App<'static, 'static> {
+    App::new(COMMAND_NAME)
+        .version(env!("CARGO_PKG_VERSION"))
+        .author(env!("CARGO_PKG_AUTHORS"))
+        .about("Play against the chess engine from terminal")
+        .arg(
+            Arg::with_name("depth")
+                .long("depth")
+                .short("d")
+                .required(false)
+                .takes_value(true)
+                .default_value("8")
+                .possible_values(&["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"])
+                .hide_possible_values(true)
+                .help("The depth of the search tree. Higher values means better move selections."),
+        )
+        .arg(
+            Arg::with_name("start-position")
+                .long("from")
+                .short("f")
+                .required(false)
+                .takes_value(true)
+                .default_value("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+                .hide_default_value(true)
+                .help("The Forsyth-Edwards Notation (FEN) of the position to be from"),
+        )
+        .arg(
+            Arg::with_name("color")
+                .long("color")
+                .short("c")
+                .required(false)
+                .default_value("White")
+                .possible_values(&["White", "Black"])
+                .help("The color you want to play as"),
+        )
+}
 
-impl<'a, 'b> Command<'a, 'b> for PlayCommand {
-    fn command_name(&self) -> &'static str {
-        COMMAND_NAME
-    }
+pub fn exec(matches: &ArgMatches) {
+    let start_position = matches.value_of("start-position").unwrap();
+    let mut game = Game::from_str(start_position).expect("Failed to parse FEN");
+    let color = matches.value_of("color").unwrap();
+    let depth: u8 = matches.value_of("depth").unwrap().parse().unwrap();
 
-    fn options(&self) -> App<'a, 'b> {
-        SubCommand::with_name(COMMAND_NAME)
-            .about("Play against the chess engine from terminal")
-            .arg(
-                Arg::with_name("depth")
-                    .long("depth")
-                    .short("d")
-                    .required(false)
-                    .takes_value(true)
-                    .default_value("8")
-                    .possible_values(&["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"])
-                    .hide_possible_values(true)
-                    .help(
-                        "The depth of the search tree. Higher values means better move selections.",
-                    ),
-            )
-            .arg(
-                Arg::with_name("start-position")
-                    .long("from")
-                    .short("f")
-                    .required(false)
-                    .takes_value(true)
-                    .default_value("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-                    .hide_default_value(true)
-                    .help("The Forsyth-Edwards Notation (FEN) of the position to be from"),
-            )
-            .arg(
-                Arg::with_name("color")
-                    .long("color")
-                    .short("c")
-                    .required(false)
-                    .default_value("White")
-                    .possible_values(&["White", "Black"])
-                    .help("The color you want to play as"),
-            )
-    }
-
-    fn exec(&self, matches: &ArgMatches) {
-        let start_position = matches.value_of("start-position").unwrap();
-        let mut game = Game::from_str(start_position).expect("Failed to parse FEN");
-        let color = matches.value_of("color").unwrap();
-        let depth: u8 = matches.value_of("depth").unwrap().parse().unwrap();
-
-        if color == "White" {
-            let white_player = agent::command_line_agent();
-            let black_player = agent::alpha_beta_agent(depth);
-            play_game(&mut game, &white_player, &black_player, false);
-        } else {
-            let white_player = agent::alpha_beta_agent(depth);
-            let black_player = agent::command_line_agent();
-            play_game(&mut game, &white_player, &black_player, true);
-        }
+    if color == "White" {
+        let white_player = agent::command_line_agent();
+        let black_player = agent::alpha_beta_agent(depth);
+        play_game(&mut game, &white_player, &black_player, false);
+    } else {
+        let white_player = agent::alpha_beta_agent(depth);
+        let black_player = agent::command_line_agent();
+        play_game(&mut game, &white_player, &black_player, true);
     }
 }
 

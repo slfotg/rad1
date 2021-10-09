@@ -1,0 +1,14 @@
+[package]
+name = "rad1"
+version = "0.2.1"
+authors = ["Sam Foster <slfotg@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+chess = "3.2.0"
+lazy_static = "1.4.0"
+rand = "0.8.3"
+tokio = { version = "1.12.0", features = ["rt", "rt-multi-thread", "sync"] }
+
+[dev-dependencies]
+test-case = "1.1.0"

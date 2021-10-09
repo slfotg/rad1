@@ -1,6 +1,7 @@
 use clap::{App, AppSettings};
-use rad1::command;
-use rad1::command::Command;
+
+mod command;
+use command::Command;
 
 fn main() {
     let analyze_command = command::analyze();

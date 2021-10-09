@@ -1,8 +1,8 @@
 use super::Command;
-use crate::agent;
-use crate::agent::ChessAgent;
 use chess::Game;
 use clap::{App, Arg, ArgMatches, SubCommand};
+use rad1::agent;
+use rad1::agent::ChessAgent;
 use std::str::FromStr;
 
 const COMMAND_NAME: &str = "analyze";

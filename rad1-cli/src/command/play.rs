@@ -1,11 +1,11 @@
 use super::Command;
-use crate::agent;
-use crate::agent::ChessAgent;
 use ansi_term::Colour;
 use ansi_term::Style;
 use chess::{Action, Board, Color, Game, Piece, Rank, Square};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use itertools::Either;
+use rad1::agent;
+use rad1::agent::ChessAgent;
 use std::str::FromStr;
 
 const COMMAND_NAME: &str = "play";

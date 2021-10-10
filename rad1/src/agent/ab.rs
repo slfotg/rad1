@@ -1,5 +1,6 @@
 use super::ChessAgent;
-use crate::eval::Evaluation;
+use crate::eval;
+use crate::eval::Evaluator;
 use crate::move_sorter::MOVE_SORTER;
 use crate::tt::*;
 use chess::{Action, Board, BoardStatus, ChessMove, Game};
@@ -7,70 +8,27 @@ use std::cmp;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-// quiescence search
-fn q_search(board: &Board, mut alpha: i16, beta: i16) -> i16 {
-    let evaluation = Evaluation::evaluate(board);
-    if evaluation >= beta {
-        beta
-    } else {
-        if alpha < evaluation {
-            alpha = evaluation;
-        }
-        for m in MOVE_SORTER.sorted_captures(board).into_iter() {
-            let score = -q_search(&board.make_move_new(m), -beta, -alpha);
-            if score >= beta {
-                alpha = beta;
-                break;
-            }
-            if score > alpha {
-                alpha = score;
-            }
-        }
-        alpha
-    }
-}
-
-// this is really just a pure alpha beta search
-// with no caching or storing evaluations in nodes
-// used for the null move heursitic
-fn null_alpha_beta(board: &Board, depth: u8, mut alpha: i16, beta: i16) -> i16 {
-    if depth == 0 {
-        Evaluation::evaluate(board)
-    } else {
-        for child_move in MOVE_SORTER.sorted_moves(board, None) {
-            let val = -null_alpha_beta(&board.make_move_new(child_move), depth - 1, -beta, -alpha);
-            if val >= beta {
-                return beta;
-            }
-            if val > alpha {
-                alpha = val;
-            }
-        }
-        alpha
-    }
-}
-
-fn check_extension(board: &Board, depth: &mut u8, check_extension_enabled: &mut bool) {
-    if *check_extension_enabled && board.checkers().popcnt() > 0 {
-        *depth += 1;
-        // only allow one check extension in a search path
-        *check_extension_enabled = false;
-    }
-}
-
 pub struct AlphaBetaChessAgent {
     depth: u8,
-    evaluator: Arc<TranspositionTable>,
+    tt: Arc<TranspositionTable>,
+    evaluator: Arc<dyn Evaluator<i16>>,
     runtime: Runtime,
+}
+
+impl Default for AlphaBetaChessAgent {
+    fn default() -> Self {
+        Self::new(8)
+    }
 }
 
 impl AlphaBetaChessAgent {
     pub fn new(depth: u8) -> Self {
         let runtime = Runtime::new().unwrap();
-        let evaluator = Arc::default();
+        let tt = Arc::default();
         AlphaBetaChessAgent {
             depth,
-            evaluator,
+            tt,
+            evaluator: Arc::new(eval::naive_evaluator()),
             runtime,
         }
     }
@@ -82,7 +40,7 @@ impl AlphaBetaChessAgent {
         alpha: &mut i16,
         beta: &mut i16,
     ) -> Option<i16> {
-        match self.evaluator.get_evaluation(board) {
+        match self.tt.get_evaluation(board) {
             None => None,
             Some(cached_eval) => {
                 if cached_eval.depth() >= depth {
@@ -114,7 +72,7 @@ impl AlphaBetaChessAgent {
         value: i16,
         best_move: ChessMove,
     ) {
-        let tt = Arc::clone(&self.evaluator);
+        let tt = Arc::clone(&self.tt);
         let board = *board;
         self.runtime.spawn(async move {
             let cached_eval = if value <= alpha {
@@ -132,8 +90,64 @@ impl AlphaBetaChessAgent {
         });
     }
 
+    fn check_extension(board: &Board, depth: &mut u8, check_extension_enabled: &mut bool) {
+        if *check_extension_enabled && board.checkers().popcnt() > 0 {
+            *depth += 1;
+            // only allow one check extension in a search path
+            *check_extension_enabled = false;
+        }
+    }
+
     fn expand(&self, board: &Board) -> Vec<ChessMove> {
-        MOVE_SORTER.sorted_moves(board, self.evaluator.best_move(board))
+        MOVE_SORTER.sorted_moves(board, self.tt.best_move(board))
+    }
+
+    // quiescence search
+    fn q_search(&self, board: &Board, mut alpha: i16, beta: i16) -> i16 {
+        let evaluation = self.evaluator.evaluate(board);
+        if evaluation >= beta {
+            beta
+        } else {
+            if alpha < evaluation {
+                alpha = evaluation;
+            }
+            for m in MOVE_SORTER.sorted_captures(board).into_iter() {
+                let score = -self.q_search(&board.make_move_new(m), -beta, -alpha);
+                if score >= beta {
+                    alpha = beta;
+                    break;
+                }
+                if score > alpha {
+                    alpha = score;
+                }
+            }
+            alpha
+        }
+    }
+
+    // this is really just a pure alpha beta search
+    // with no caching or storing evaluations in nodes
+    // used for the null move heursitic
+    fn null_alpha_beta(&self, board: &Board, depth: u8, mut alpha: i16, beta: i16) -> i16 {
+        if depth == 0 {
+            self.evaluator.evaluate(board)
+        } else {
+            for child_move in MOVE_SORTER.sorted_moves(board, None) {
+                let val = -self.null_alpha_beta(
+                    &board.make_move_new(child_move),
+                    depth - 1,
+                    -beta,
+                    -alpha,
+                );
+                if val >= beta {
+                    return beta;
+                }
+                if val > alpha {
+                    alpha = val;
+                }
+            }
+            alpha
+        }
     }
 
     fn null_window_search(
@@ -214,7 +228,7 @@ impl AlphaBetaChessAgent {
         mut beta: i16,
         mut check_extension_enabled: bool,
     ) -> i16 {
-        check_extension(board, &mut depth, &mut check_extension_enabled);
+        Self::check_extension(board, &mut depth, &mut check_extension_enabled);
         let status = board.status();
         let alpha_orig = alpha;
         // Get cached evaluation if it exists and update alpha/beta accordingly
@@ -224,19 +238,19 @@ impl AlphaBetaChessAgent {
         }
         // If game is over, return evaluation
         if status != BoardStatus::Ongoing {
-            return Evaluation::evaluate(board);
+            return self.evaluator.evaluate(board);
         }
         // If depth is 0, evaluate after quiesence search, cache and return
         if depth == 0 {
-            let value = q_search(board, alpha, beta);
-            self.evaluator
+            let value = self.q_search(board, alpha, beta);
+            self.tt
                 .update_evaluation(board, CachedValue::new(depth, value, NodeType::PvNode));
             return value;
         }
         // depth >= 3, try null-move pruning
         if depth >= 3 {
             if let Some(null_move_game) = board.null_move() {
-                let score = -null_alpha_beta(&null_move_game, depth - 3, -beta, -beta + 1);
+                let score = -self.null_alpha_beta(&null_move_game, depth - 3, -beta, -beta + 1);
                 if score >= beta {
                     return beta;
                 }
@@ -253,20 +267,18 @@ impl AlphaBetaChessAgent {
 
 impl ChessAgent for AlphaBetaChessAgent {
     fn get_action(&self, game: &Game) -> Action {
-        let alpha = Evaluation::MIN;
-        let beta = Evaluation::MAX;
+        let alpha = self.evaluator.min_value();
+        let beta = self.evaluator.max_value();
 
         for i in 1..=self.depth {
             self.alpha_beta(&game.current_position(), i, alpha, beta, true);
-            let best_move = self.evaluator.best_move(&game.current_position());
-            let evaluation = self
-                .evaluator
-                .get_shallow_evaluation(&game.current_position());
+            let best_move = self.tt.best_move(&game.current_position());
+            let evaluation = self.tt.get_shallow_evaluation(&game.current_position());
             println!("{} - {:?} = {:?}", i, best_move, evaluation);
         }
 
         // get best move
-        let best_move = self.evaluator.best_move(&game.current_position()).unwrap();
+        let best_move = self.tt.best_move(&game.current_position()).unwrap();
 
         println!("Best move: {}", best_move);
         Action::MakeMove(best_move)

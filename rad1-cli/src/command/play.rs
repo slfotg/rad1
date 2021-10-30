@@ -1,16 +1,15 @@
-use ansi_term::Colour;
-use ansi_term::Style;
+use ansi_term::{Colour, Style};
 use chess::{Action, Board, Color, Game, Piece, Rank, Square};
 use clap::{App, Arg, ArgMatches};
 use itertools::Either;
 use rad1::agent;
 use rad1::agent::ChessAgent;
+use rad1::eval;
+use rad1::tt::TranspositionTable;
 use std::str::FromStr;
 
-pub const COMMAND_NAME: &str = "play";
-
-pub fn play_app() -> App<'static, 'static> {
-    App::new(COMMAND_NAME)
+pub fn play_app(command_name: &str) -> App<'static, 'static> {
+    App::new(command_name)
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .about("Play against the chess engine from terminal")
@@ -54,10 +53,18 @@ pub fn exec(matches: &ArgMatches) {
 
     if color == "White" {
         let white_player = agent::command_line_agent();
-        let black_player = agent::alpha_beta_agent(depth);
+        let black_player = agent::alpha_beta_agent(
+            depth,
+            TranspositionTable::default(),
+            Box::new(eval::naive_evaluator()),
+        );
         play_game(&mut game, &white_player, &black_player, false);
     } else {
-        let white_player = agent::alpha_beta_agent(depth);
+        let white_player = agent::alpha_beta_agent(
+            depth,
+            TranspositionTable::default(),
+            Box::new(eval::naive_evaluator()),
+        );
         let black_player = agent::command_line_agent();
         play_game(&mut game, &white_player, &black_player, true);
     }

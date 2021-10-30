@@ -1,5 +1,5 @@
 use crate::move_hash;
-use std::sync::Mutex;
+use std::cell::RefCell;
 
 use chess::{Board, ChessMove};
 
@@ -86,10 +86,11 @@ impl Default for ShallowHash {
     }
 }
 
+#[derive(Clone)]
 pub struct TranspositionTable {
     cache_size: u64,
-    cache: Vec<Mutex<EvaluationHash>>,
-    shallow_hash: Vec<Mutex<ShallowHash>>,
+    cache: Vec<RefCell<EvaluationHash>>,
+    shallow_hash: Vec<RefCell<ShallowHash>>,
 }
 
 impl Default for TranspositionTable {
@@ -103,14 +104,23 @@ impl TranspositionTable {
         Self::new(cache_size)
     }
 
+    pub fn clear(&mut self) {
+        for i in 0..self.cache.len() {
+            self.cache[i] = RefCell::default();
+        }
+        for i in 0..self.shallow_hash.len() {
+            self.shallow_hash[i] = RefCell::default();
+        }
+    }
+
     pub fn new(cache_size: usize) -> Self {
         let mut cache = Vec::with_capacity(cache_size);
         for _ in 0..cache_size {
-            cache.push(Mutex::default());
+            cache.push(RefCell::default());
         }
         let mut shallow_hash = Vec::with_capacity(SHALLOW_HASH_SIZE as usize);
         for _ in 0..SHALLOW_HASH_SIZE {
-            shallow_hash.push(Mutex::default());
+            shallow_hash.push(RefCell::default());
         }
         let cache_size = cache_size as u64;
         Self {
@@ -121,11 +131,8 @@ impl TranspositionTable {
     }
 
     pub fn get_evaluation(&self, board: &Board) -> Option<CachedValue> {
-        let evaluation_hash = {
-            *self.cache[(board.get_hash() % self.cache_size) as usize]
-                .lock()
-                .unwrap()
-        };
+        let evaluation_hash =
+            { *self.cache[(board.get_hash() % self.cache_size) as usize].borrow() };
         if evaluation_hash.hash == board.get_hash() {
             Some(evaluation_hash.cached_value())
         } else {
@@ -134,11 +141,8 @@ impl TranspositionTable {
     }
 
     pub fn get_evaluation_debug(&self, board: &Board) -> Option<CachedValue> {
-        let evaluation_hash = {
-            *self.cache[(board.get_hash() % self.cache_size) as usize]
-                .lock()
-                .unwrap()
-        };
+        let evaluation_hash =
+            { *self.cache[(board.get_hash() % self.cache_size) as usize].borrow() };
         println!(
             "current hash: {}, board hash: {}, value: {}",
             evaluation_hash.hash,
@@ -154,9 +158,8 @@ impl TranspositionTable {
 
     pub fn update_evaluation(&self, board: &Board, cached_eval: CachedValue) {
         {
-            let mut evaluation_hash = self.cache[(board.get_hash() % self.cache_size) as usize]
-                .lock()
-                .unwrap();
+            let mut evaluation_hash =
+                self.cache[(board.get_hash() % self.cache_size) as usize].borrow_mut();
             if evaluation_hash.depth >= cached_eval.depth() {
                 evaluation_hash.hash = board.get_hash();
                 evaluation_hash.depth = cached_eval.depth();
@@ -165,10 +168,8 @@ impl TranspositionTable {
             }
         }
         {
-            let mut shallow_hash = self.shallow_hash
-                [(board.get_hash() % SHALLOW_HASH_SIZE) as usize]
-                .lock()
-                .unwrap();
+            let mut shallow_hash =
+                self.shallow_hash[(board.get_hash() % SHALLOW_HASH_SIZE) as usize].borrow_mut();
             if shallow_hash.depth <= cached_eval.depth() {
                 shallow_hash.hash = board.get_hash();
                 shallow_hash.depth = cached_eval.depth();
@@ -178,9 +179,8 @@ impl TranspositionTable {
     }
 
     pub fn best_move(&self, board: &Board) -> Option<ChessMove> {
-        let shallow_hash = self.shallow_hash[(board.get_hash() % SHALLOW_HASH_SIZE) as usize]
-            .lock()
-            .unwrap();
+        let shallow_hash =
+            self.shallow_hash[(board.get_hash() % SHALLOW_HASH_SIZE) as usize].borrow();
         if shallow_hash.best_move_hash == 0 || shallow_hash.hash != board.get_hash() {
             None
         } else {
@@ -189,9 +189,8 @@ impl TranspositionTable {
     }
 
     pub fn update_best_move(&self, board: &Board, depth: u8, best_move: ChessMove) {
-        let mut shallow_hash = self.shallow_hash[(board.get_hash() % SHALLOW_HASH_SIZE) as usize]
-            .lock()
-            .unwrap();
+        let mut shallow_hash =
+            self.shallow_hash[(board.get_hash() % SHALLOW_HASH_SIZE) as usize].borrow_mut();
         if shallow_hash.depth <= depth {
             shallow_hash.hash = board.get_hash();
             shallow_hash.depth = depth;
@@ -200,9 +199,8 @@ impl TranspositionTable {
     }
 
     pub fn get_shallow_evaluation(&self, board: &Board) -> Option<i16> {
-        let shallow_hash = self.shallow_hash[(board.get_hash() % SHALLOW_HASH_SIZE) as usize]
-            .lock()
-            .unwrap();
+        let shallow_hash =
+            self.shallow_hash[(board.get_hash() % SHALLOW_HASH_SIZE) as usize].borrow();
         if shallow_hash.best_move_hash == 0 || shallow_hash.hash != board.get_hash() {
             None
         } else {

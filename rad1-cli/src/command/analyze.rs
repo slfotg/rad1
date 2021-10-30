@@ -2,12 +2,12 @@ use chess::Game;
 use clap::{App, Arg, ArgMatches};
 use rad1::agent;
 use rad1::agent::ChessAgent;
+use rad1::eval;
+use rad1::tt::TranspositionTable;
 use std::str::FromStr;
 
-pub const COMMAND_NAME: &str = "analyze";
-
-pub fn analyze_app() -> App<'static, 'static> {
-    App::new(COMMAND_NAME)
+pub fn analyze_app(command_name: &str) -> App<'static, 'static> {
+    App::new(command_name)
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .about("Analyze a single position with Rad1 chess engine")
@@ -40,6 +40,10 @@ pub fn exec(matches: &ArgMatches) {
 }
 
 fn analyze_position(game: &Game, depth: u8) {
-    let agent = agent::alpha_beta_agent(depth);
+    let agent = agent::alpha_beta_agent(
+        depth,
+        TranspositionTable::default(),
+        Box::new(eval::naive_evaluator()),
+    );
     agent.get_action(game);
 }

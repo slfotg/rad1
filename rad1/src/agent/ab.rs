@@ -1,36 +1,27 @@
 use super::ChessAgent;
-use crate::eval;
 use crate::eval::Evaluator;
 use crate::move_sorter::MOVE_SORTER;
 use crate::tt::*;
 use chess::{Action, Board, BoardStatus, ChessMove, Game};
 use std::cmp;
-use std::sync::Arc;
-use tokio::runtime::Runtime;
 
 pub struct AlphaBetaChessAgent {
     depth: u8,
-    tt: Arc<TranspositionTable>,
-    evaluator: Arc<dyn Evaluator<i16>>,
-    runtime: Runtime,
-}
-
-impl Default for AlphaBetaChessAgent {
-    fn default() -> Self {
-        Self::new(8)
-    }
+    tt: TranspositionTable,
+    evaluator: Box<dyn Evaluator<i16>>,
 }
 
 impl AlphaBetaChessAgent {
-    pub fn new(depth: u8) -> Self {
-        let runtime = Runtime::new().unwrap();
-        let tt = Arc::default();
+    pub fn new(depth: u8, tt: TranspositionTable, evaluator: Box<dyn Evaluator<i16>>) -> Self {
         AlphaBetaChessAgent {
             depth,
             tt,
-            evaluator: Arc::new(eval::naive_evaluator()),
-            runtime,
+            evaluator,
         }
+    }
+
+    pub fn set_evaluator(&mut self, evaluator: Box<dyn Evaluator<i16>>) {
+        self.evaluator = evaluator;
     }
 
     fn cached_evaluation(
@@ -72,22 +63,19 @@ impl AlphaBetaChessAgent {
         value: i16,
         best_move: ChessMove,
     ) {
-        let tt = Arc::clone(&self.tt);
         let board = *board;
-        self.runtime.spawn(async move {
-            let cached_eval = if value <= alpha {
-                // Beta
-                CachedValue::new(depth, value, NodeType::AllNode)
-            } else if value >= beta {
-                // Alpha
-                CachedValue::new(depth, value, NodeType::CutNode)
-            } else {
-                // Exact
-                CachedValue::new(depth, value, NodeType::PvNode)
-            };
-            tt.update_evaluation(&board, cached_eval);
-            tt.update_best_move(&board, depth, best_move);
-        });
+        let cached_eval = if value <= alpha {
+            // Beta
+            CachedValue::new(depth, value, NodeType::AllNode)
+        } else if value >= beta {
+            // Alpha
+            CachedValue::new(depth, value, NodeType::CutNode)
+        } else {
+            // Exact
+            CachedValue::new(depth, value, NodeType::PvNode)
+        };
+        self.tt.update_evaluation(&board, cached_eval);
+        self.tt.update_best_move(&board, depth, best_move);
     }
 
     fn check_extension(board: &Board, depth: &mut u8, check_extension_enabled: &mut bool) {
@@ -272,15 +260,16 @@ impl ChessAgent for AlphaBetaChessAgent {
 
         for i in 1..=self.depth {
             self.alpha_beta(&game.current_position(), i, alpha, beta, true);
-            let best_move = self.tt.best_move(&game.current_position());
-            let evaluation = self.tt.get_shallow_evaluation(&game.current_position());
-            println!("{} - {:?} = {:?}", i, best_move, evaluation);
+            // let best_move = self.tt.best_move(&game.current_position());
+            // let evaluation = self.tt.get_shallow_evaluation(&game.current_position());
+            // println!("{} - {:?} = {:?}", i, best_move, evaluation);
         }
 
         // get best move
-        let best_move = self.tt.best_move(&game.current_position()).unwrap();
+        //let best_move = self.tt.best_move(&game.current_position()).unwrap();
+        let best_move = self.expand(&game.current_position())[0];
 
-        println!("Best move: {}", best_move);
+        // println!("Best move: {}", best_move);
         Action::MakeMove(best_move)
     }
 }

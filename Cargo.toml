@@ -3,4 +3,6 @@
 members = [
     "rad1",
     "rad1-cli",
+    "rad1-parsing",
+    "rad1-tuning",
 ]

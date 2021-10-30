@@ -8,11 +8,15 @@ use std::cmp;
 pub struct AlphaBetaChessAgent {
     depth: u8,
     tt: TranspositionTable,
-    evaluator: Box<dyn Evaluator<i16>>,
+    evaluator: Box<dyn Evaluator<Result = i16>>,
 }
 
 impl AlphaBetaChessAgent {
-    pub fn new(depth: u8, tt: TranspositionTable, evaluator: Box<dyn Evaluator<i16>>) -> Self {
+    pub fn new(
+        depth: u8,
+        tt: TranspositionTable,
+        evaluator: Box<dyn Evaluator<Result = i16>>,
+    ) -> Self {
         AlphaBetaChessAgent {
             depth,
             tt,
@@ -20,7 +24,7 @@ impl AlphaBetaChessAgent {
         }
     }
 
-    pub fn set_evaluator(&mut self, evaluator: Box<dyn Evaluator<i16>>) {
+    pub fn set_evaluator(&mut self, evaluator: Box<dyn Evaluator<Result = i16>>) {
         self.evaluator = evaluator;
     }
 

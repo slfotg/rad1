@@ -2,15 +2,13 @@ use chess::Board;
 
 mod naive;
 
-pub trait Evaluator<T>
-where
-    T: PartialEq + PartialOrd,
-{
-    fn min_value(&self) -> T;
-    fn max_value(&self) -> T;
-    fn evaluate(&self, board: &Board) -> T;
+pub trait Evaluator {
+    type Result;
+    fn min_value(&self) -> Self::Result;
+    fn max_value(&self) -> Self::Result;
+    fn evaluate(&self, board: &Board) -> Self::Result;
 }
 
-pub fn naive_evaluator() -> impl Evaluator<i16> {
+pub fn naive_evaluator() -> impl Evaluator<Result = i16> {
     naive::NaiveEvaluator::default()
 }

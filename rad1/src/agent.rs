@@ -22,7 +22,7 @@ pub fn command_line_agent() -> cli::CommandLineAgent {
 pub fn alpha_beta_agent(
     depth: u8,
     tt: TranspositionTable,
-    evaluator: Box<dyn Evaluator<i16>>,
+    evaluator: Box<dyn Evaluator<Result = i16>>,
 ) -> ab::AlphaBetaChessAgent {
     ab::AlphaBetaChessAgent::new(depth, tt, evaluator)
 }

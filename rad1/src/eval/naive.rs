@@ -95,19 +95,20 @@ impl NaiveEvaluator {
     }
 }
 
-impl Evaluator<i16> for NaiveEvaluator {
+impl Evaluator for NaiveEvaluator {
+    type Result = i16;
     #[inline]
-    fn min_value(&self) -> i16 {
+    fn min_value(&self) -> Self::Result {
         Self::MIN
     }
 
     #[inline]
-    fn max_value(&self) -> i16 {
+    fn max_value(&self) -> Self::Result {
         Self::MAX
     }
 
     #[inline]
-    fn evaluate(&self, board: &Board) -> i16 {
+    fn evaluate(&self, board: &Board) -> Self::Result {
         match board.status() {
             BoardStatus::Stalemate => Self::ZERO,
             BoardStatus::Checkmate => Self::MIN,

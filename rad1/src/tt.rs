@@ -1,210 +1,167 @@
 use crate::move_hash;
+use crate::node::NodeValue;
 use std::cell::RefCell;
+use std::sync::Mutex;
 
 use chess::{Board, ChessMove};
 
-const CACHE_SIZE: usize = 50000000;
-const SHALLOW_HASH_SIZE: u64 = 500000;
+const CACHE_SIZE: usize = 30000000;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NodeType {
-    PvNode,
-    AllNode,
-    CutNode,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CachedValue {
-    depth: u8,
-    evaluation: i16,
-    node_type: NodeType,
-}
-
-impl CachedValue {
-    pub fn new(depth: u8, evaluation: i16, node_type: NodeType) -> Self {
-        Self {
-            depth,
-            evaluation,
-            node_type,
-        }
-    }
-
-    pub fn depth(&self) -> u8 {
-        self.depth
-    }
-
-    pub fn evaluation(&self) -> i16 {
-        self.evaluation
-    }
-
-    pub fn node_type(&self) -> NodeType {
-        self.node_type
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 struct EvaluationHash {
     hash: u64,
     depth: u8,
-    evaluation: i16,
-    node_type: NodeType,
-}
-
-impl Default for EvaluationHash {
-    fn default() -> Self {
-        Self {
-            hash: 0,
-            depth: 255,
-            evaluation: 0,
-            node_type: NodeType::PvNode,
-        }
-    }
-}
-
-impl EvaluationHash {
-    fn cached_value(&self) -> CachedValue {
-        CachedValue::new(self.depth, self.evaluation, self.node_type)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ShallowHash {
-    hash: u64,
-    depth: u8,
-    evaluation: i16,
+    value: NodeValue<i16>,
     best_move_hash: u16,
 }
 
-impl Default for ShallowHash {
-    fn default() -> Self {
-        Self {
-            hash: 0,
-            depth: 0,
-            evaluation: 0,
-            best_move_hash: 0,
-        }
-    }
-}
-
-#[derive(Clone)]
 pub struct TranspositionTable {
     cache_size: u64,
-    cache: Vec<RefCell<EvaluationHash>>,
-    shallow_hash: Vec<RefCell<ShallowHash>>,
+    deep_cache: Vec<Mutex<RefCell<(u8, EvaluationHash)>>>,
+    shallow_cache: Vec<Mutex<RefCell<EvaluationHash>>>,
 }
 
 impl Default for TranspositionTable {
     fn default() -> Self {
-        Self::with_cache_size(CACHE_SIZE)
+        Self::new(CACHE_SIZE)
     }
 }
 
 impl TranspositionTable {
-    pub fn with_cache_size(cache_size: usize) -> Self {
-        Self::new(cache_size)
-    }
-
-    pub fn clear(&mut self) {
-        for i in 0..self.cache.len() {
-            self.cache[i] = RefCell::default();
-        }
-        for i in 0..self.shallow_hash.len() {
-            self.shallow_hash[i] = RefCell::default();
-        }
-    }
-
     pub fn new(cache_size: usize) -> Self {
-        let mut cache = Vec::with_capacity(cache_size);
-        for _ in 0..cache_size {
-            cache.push(RefCell::default());
+        let size = cache_size / 2;
+        let mut deep_cache = Vec::with_capacity(size);
+        let mut shallow_cache = Vec::with_capacity(size);
+        for _ in 0..size {
+            shallow_cache.push(Mutex::default());
+            let deep_value = EvaluationHash {
+                hash: 0,
+                depth: 255,
+                value: NodeValue::default(),
+                best_move_hash: 0,
+            };
+            deep_cache.push(Mutex::new(RefCell::new((0, deep_value))));
         }
-        let mut shallow_hash = Vec::with_capacity(SHALLOW_HASH_SIZE as usize);
-        for _ in 0..SHALLOW_HASH_SIZE {
-            shallow_hash.push(RefCell::default());
-        }
-        let cache_size = cache_size as u64;
         Self {
-            cache_size,
-            cache,
-            shallow_hash,
-        }
-    }
-
-    pub fn get_evaluation(&self, board: &Board) -> Option<CachedValue> {
-        let evaluation_hash =
-            { *self.cache[(board.get_hash() % self.cache_size) as usize].borrow() };
-        if evaluation_hash.hash == board.get_hash() {
-            Some(evaluation_hash.cached_value())
-        } else {
-            None
-        }
-    }
-
-    pub fn get_evaluation_debug(&self, board: &Board) -> Option<CachedValue> {
-        let evaluation_hash =
-            { *self.cache[(board.get_hash() % self.cache_size) as usize].borrow() };
-        println!(
-            "current hash: {}, board hash: {}, value: {}",
-            evaluation_hash.hash,
-            board.get_hash(),
-            evaluation_hash.evaluation
-        );
-        if evaluation_hash.hash == board.get_hash() {
-            Some(evaluation_hash.cached_value())
-        } else {
-            None
-        }
-    }
-
-    pub fn update_evaluation(&self, board: &Board, cached_eval: CachedValue) {
-        {
-            let mut evaluation_hash =
-                self.cache[(board.get_hash() % self.cache_size) as usize].borrow_mut();
-            if evaluation_hash.depth >= cached_eval.depth() {
-                evaluation_hash.hash = board.get_hash();
-                evaluation_hash.depth = cached_eval.depth();
-                evaluation_hash.evaluation = cached_eval.evaluation();
-                evaluation_hash.node_type = cached_eval.node_type();
-            }
-        }
-        {
-            let mut shallow_hash =
-                self.shallow_hash[(board.get_hash() % SHALLOW_HASH_SIZE) as usize].borrow_mut();
-            if shallow_hash.depth <= cached_eval.depth() {
-                shallow_hash.hash = board.get_hash();
-                shallow_hash.depth = cached_eval.depth();
-                shallow_hash.evaluation = cached_eval.evaluation();
-            }
+            cache_size: size as u64,
+            deep_cache,
+            shallow_cache,
         }
     }
 
     pub fn best_move(&self, board: &Board) -> Option<ChessMove> {
-        let shallow_hash =
-            self.shallow_hash[(board.get_hash() % SHALLOW_HASH_SIZE) as usize].borrow();
-        if shallow_hash.best_move_hash == 0 || shallow_hash.hash != board.get_hash() {
-            None
-        } else {
-            Some(move_hash::get_move(shallow_hash.best_move_hash))
+        let hash = board.get_hash();
+        // try from shallow cache first
+        {
+            let guard = self.shallow_cache[(hash % self.cache_size) as usize]
+                .lock()
+                .unwrap();
+            let value = guard.borrow();
+            if value.hash == hash && value.best_move_hash != 0 {
+                return Some(move_hash::get_move(value.best_move_hash));
+            }
         }
+        // try from deep cache second
+        {
+            let guard = self.deep_cache[(hash % self.cache_size) as usize]
+                .lock()
+                .unwrap();
+            let value = guard.borrow();
+            if value.1.hash == hash && value.1.best_move_hash != 0 {
+                return Some(move_hash::get_move(value.1.best_move_hash));
+            }
+        }
+        // otherwise return None
+        None
     }
 
-    pub fn update_best_move(&self, board: &Board, depth: u8, best_move: ChessMove) {
-        let mut shallow_hash =
-            self.shallow_hash[(board.get_hash() % SHALLOW_HASH_SIZE) as usize].borrow_mut();
-        if shallow_hash.depth <= depth {
-            shallow_hash.hash = board.get_hash();
-            shallow_hash.depth = depth;
-            shallow_hash.best_move_hash = move_hash::get_hash(best_move);
+    pub fn get_evaluation_and_depth(&self, board: &Board) -> Option<(NodeValue<i16>, u8)> {
+        let hash = board.get_hash();
+        // try from deep cache first
+        {
+            let guard = self.deep_cache[(hash % self.cache_size) as usize]
+                .lock()
+                .unwrap();
+            let value = guard.borrow();
+            if value.1.hash == hash && value.1.best_move_hash != 0 {
+                return Some((value.1.value, value.1.depth));
+            }
         }
+        // try from shallow cache second
+        {
+            let guard = self.shallow_cache[(hash % self.cache_size) as usize]
+                .lock()
+                .unwrap();
+            let value = guard.borrow();
+            if value.hash == hash && value.best_move_hash != 0 {
+                return Some((value.value, value.depth));
+            }
+        }
+        None
     }
 
-    pub fn get_shallow_evaluation(&self, board: &Board) -> Option<i16> {
-        let shallow_hash =
-            self.shallow_hash[(board.get_hash() % SHALLOW_HASH_SIZE) as usize].borrow();
-        if shallow_hash.best_move_hash == 0 || shallow_hash.hash != board.get_hash() {
-            None
-        } else {
-            Some(shallow_hash.evaluation)
+    pub fn update_evaluation_and_best_move(
+        &self,
+        board: &Board,
+        depth: u8,
+        node: NodeValue<i16>,
+        best_move: Option<ChessMove>,
+    ) {
+        let hash = board.get_hash();
+        // update shallow cache
+        {
+            let guard = self.shallow_cache[(hash % self.cache_size) as usize]
+                .lock()
+                .unwrap();
+            let mut value = guard.borrow_mut();
+            if value.depth <= depth {
+                value.depth = depth;
+                value.hash = hash;
+                value.value = node;
+                if let Some(chess_move) = best_move {
+                    value.best_move_hash = move_hash::get_hash(chess_move);
+                }
+            }
         }
+        // update deep cache
+        {
+            let guard = self.deep_cache[(hash % self.cache_size) as usize]
+                .lock()
+                .unwrap();
+            let mut value = guard.borrow_mut();
+            if value.1.depth >= depth {
+                value.1.depth = depth;
+                value.1.hash = hash;
+                value.1.value = node;
+                if let Some(chess_move) = best_move {
+                    value.1.best_move_hash = move_hash::get_hash(chess_move);
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TranspositionTable;
+    use crate::node::NodeValue;
+    use chess::{Board, ChessMove, Square};
+
+    #[test]
+    fn initial_board_eval() {
+        let tt = TranspositionTable::new(1000);
+        let board = Board::default();
+        tt.update_evaluation_and_best_move(
+            &board,
+            1,
+            NodeValue::pv_node(50),
+            Some(ChessMove::new(Square::E2, Square::E4, None)),
+        );
+        let (eval, depth) = tt.get_evaluation_and_depth(&board).unwrap();
+        assert_eq!(depth, 1);
+        assert_eq!(eval, NodeValue::pv_node(50));
+
+        let chess_move = tt.best_move(&board).unwrap();
+        assert_eq!(chess_move, ChessMove::new(Square::E2, Square::E4, None));
     }
 }

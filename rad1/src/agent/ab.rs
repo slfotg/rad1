@@ -1,6 +1,7 @@
 use super::ChessAgent;
 use crate::eval::Evaluator;
 use crate::move_sorter::MOVE_SORTER;
+use crate::node::NodeValue;
 use crate::tt::*;
 use chess::{Action, Board, BoardStatus, ChessMove, Game};
 use std::cmp;
@@ -35,18 +36,17 @@ impl AlphaBetaChessAgent {
         alpha: &mut i16,
         beta: &mut i16,
     ) -> Option<i16> {
-        match self.tt.get_evaluation(board) {
+        match self.tt.get_evaluation_and_depth(board) {
             None => None,
-            Some(cached_eval) => {
-                if cached_eval.depth() >= depth {
-                    let value = cached_eval.evaluation();
-                    match cached_eval.node_type() {
-                        NodeType::PvNode => Some(value),
-                        NodeType::AllNode => {
+            Some((cached_eval, evaluation_depth)) => {
+                if evaluation_depth >= depth {
+                    match cached_eval {
+                        NodeValue::Principal { value } => Some(value),
+                        NodeValue::All { value } => {
                             *alpha = cmp::max(*alpha, value);
                             None
                         }
-                        NodeType::CutNode => {
+                        NodeValue::Cut { value } => {
                             *beta = cmp::min(*beta, value);
                             None
                         }
@@ -68,18 +68,18 @@ impl AlphaBetaChessAgent {
         best_move: ChessMove,
     ) {
         let board = *board;
-        let cached_eval = if value <= alpha {
+        let node = if value <= alpha {
             // Beta
-            CachedValue::new(depth, value, NodeType::AllNode)
+            NodeValue::all_node(value)
         } else if value >= beta {
             // Alpha
-            CachedValue::new(depth, value, NodeType::CutNode)
+            NodeValue::cut_node(value)
         } else {
             // Exact
-            CachedValue::new(depth, value, NodeType::PvNode)
+            NodeValue::pv_node(value)
         };
-        self.tt.update_evaluation(&board, cached_eval);
-        self.tt.update_best_move(&board, depth, best_move);
+        self.tt
+            .update_evaluation_and_best_move(&board, depth, node, Some(best_move));
     }
 
     fn check_extension(board: &Board, depth: &mut u8, check_extension_enabled: &mut bool) {
@@ -236,7 +236,7 @@ impl AlphaBetaChessAgent {
         if depth == 0 {
             let value = self.q_search(board, alpha, beta);
             self.tt
-                .update_evaluation(board, CachedValue::new(depth, value, NodeType::PvNode));
+                .update_evaluation_and_best_move(board, depth, NodeValue::pv_node(value), None);
             return value;
         }
         // depth >= 3, try null-move pruning
@@ -264,16 +264,11 @@ impl ChessAgent for AlphaBetaChessAgent {
 
         for i in 1..=self.depth {
             self.alpha_beta(&game.current_position(), i, alpha, beta, true);
-            // let best_move = self.tt.best_move(&game.current_position());
-            // let evaluation = self.tt.get_shallow_evaluation(&game.current_position());
-            // println!("{} - {:?} = {:?}", i, best_move, evaluation);
         }
 
         // get best move
-        //let best_move = self.tt.best_move(&game.current_position()).unwrap();
         let best_move = self.expand(&game.current_position())[0];
 
-        // println!("Best move: {}", best_move);
         Action::MakeMove(best_move)
     }
 }

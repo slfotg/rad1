@@ -7,6 +7,8 @@ use chess::{Board, ChessMove};
 
 const CACHE_SIZE: usize = 30000000;
 
+type ThreadCountHash = (u8, EvaluationHash);
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 struct EvaluationHash {
     hash: u64,
@@ -17,7 +19,7 @@ struct EvaluationHash {
 
 pub struct TranspositionTable {
     cache_size: u64,
-    deep_cache: Vec<Mutex<RefCell<(u8, EvaluationHash)>>>,
+    deep_cache: Vec<Mutex<RefCell<ThreadCountHash>>>,
     shallow_cache: Vec<Mutex<RefCell<EvaluationHash>>>,
 }
 
@@ -148,7 +150,7 @@ mod tests {
     use chess::{Board, ChessMove, Square};
 
     #[test]
-    fn initial_board_eval() {
+    fn insert_new_value() {
         let tt = TranspositionTable::new(1000);
         let board = Board::default();
         tt.update_evaluation_and_best_move(
@@ -160,6 +162,56 @@ mod tests {
         let (eval, depth) = tt.get_evaluation_and_depth(&board).unwrap();
         assert_eq!(depth, 1);
         assert_eq!(eval, NodeValue::pv_node(50));
+
+        let chess_move = tt.best_move(&board).unwrap();
+        assert_eq!(chess_move, ChessMove::new(Square::E2, Square::E4, None));
+    }
+
+    #[test]
+    fn update_shallow_hash() {
+        let tt = TranspositionTable::new(1000);
+        let board = Board::default();
+        tt.update_evaluation_and_best_move(
+            &board,
+            1,
+            NodeValue::pv_node(50),
+            Some(ChessMove::new(Square::E2, Square::E4, None)),
+        );
+
+        tt.update_evaluation_and_best_move(
+            &board,
+            8,
+            NodeValue::pv_node(100),
+            Some(ChessMove::new(Square::D2, Square::D4, None)),
+        );
+        let (eval, depth) = tt.get_evaluation_and_depth(&board).unwrap();
+        assert_eq!(depth, 1);
+        assert_eq!(eval, NodeValue::pv_node(50));
+
+        let chess_move = tt.best_move(&board).unwrap();
+        assert_eq!(chess_move, ChessMove::new(Square::D2, Square::D4, None));
+    }
+
+    #[test]
+    fn update_deep_hash() {
+        let tt = TranspositionTable::new(1000);
+        let board = Board::default();
+        tt.update_evaluation_and_best_move(
+            &board,
+            1,
+            NodeValue::pv_node(50),
+            Some(ChessMove::new(Square::E2, Square::E4, None)),
+        );
+
+        tt.update_evaluation_and_best_move(
+            &board,
+            0,
+            NodeValue::pv_node(100),
+            Some(ChessMove::new(Square::D2, Square::D4, None)),
+        );
+        let (eval, depth) = tt.get_evaluation_and_depth(&board).unwrap();
+        assert_eq!(depth, 0);
+        assert_eq!(eval, NodeValue::pv_node(100));
 
         let chess_move = tt.best_move(&board).unwrap();
         assert_eq!(chess_move, ChessMove::new(Square::E2, Square::E4, None));

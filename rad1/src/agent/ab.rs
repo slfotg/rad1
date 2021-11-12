@@ -5,38 +5,39 @@ use crate::node::NodeValue;
 use crate::tt::*;
 use chess::{Action, Board, BoardStatus, ChessMove, Game};
 use std::cmp;
+use std::sync::Arc;
 
 pub struct AlphaBetaChessAgent {
     depth: u8,
-    tt: TranspositionTable,
-    evaluator: Box<dyn Evaluator<Result = i16>>,
+    tt: Arc<TranspositionTable<i16>>,
+    evaluator: Arc<dyn Evaluator<Result = i16>>,
 }
 
 impl AlphaBetaChessAgent {
     pub fn new(
         depth: u8,
-        tt: TranspositionTable,
-        evaluator: Box<dyn Evaluator<Result = i16>>,
+        tt: TranspositionTable<i16>,
+        evaluator: Arc<dyn Evaluator<Result = i16>>,
     ) -> Self {
         AlphaBetaChessAgent {
             depth,
-            tt,
+            tt: Arc::new(tt),
             evaluator,
         }
     }
 
-    pub fn set_evaluator(&mut self, evaluator: Box<dyn Evaluator<Result = i16>>) {
+    pub fn set_evaluator(&mut self, evaluator: Arc<dyn Evaluator<Result = i16>>) {
         self.evaluator = evaluator;
     }
 
     fn cached_evaluation(
-        &self,
+        tt: &TranspositionTable<i16>,
         board: &Board,
         depth: u8,
         alpha: &mut i16,
         beta: &mut i16,
     ) -> Option<i16> {
-        match self.tt.get_evaluation_and_depth(board) {
+        match tt.get_evaluation_and_depth(board) {
             None => None,
             Some((cached_eval, evaluation_depth)) => {
                 if evaluation_depth >= depth {
@@ -59,7 +60,7 @@ impl AlphaBetaChessAgent {
     }
 
     fn update_cache(
-        &self,
+        tt: &TranspositionTable<i16>,
         board: &Board,
         depth: u8,
         alpha: i16,
@@ -78,8 +79,7 @@ impl AlphaBetaChessAgent {
             // Exact
             NodeValue::pv_node(value)
         };
-        self.tt
-            .update_evaluation_and_best_move(&board, depth, node, Some(best_move));
+        tt.update_evaluation_and_best_move(&board, depth, node, Some(best_move));
     }
 
     fn check_extension(board: &Board, depth: &mut u8, check_extension_enabled: &mut bool) {
@@ -90,13 +90,18 @@ impl AlphaBetaChessAgent {
         }
     }
 
-    fn expand(&self, board: &Board) -> Vec<ChessMove> {
-        MOVE_SORTER.sorted_moves(board, self.tt.best_move(board))
+    fn expand(tt: &TranspositionTable<i16>, board: &Board) -> Vec<ChessMove> {
+        MOVE_SORTER.sorted_moves(board, tt.best_move(board))
     }
 
     // quiescence search
-    fn q_search(&self, board: &Board, mut alpha: i16, beta: i16) -> i16 {
-        let evaluation = self.evaluator.evaluate(board);
+    fn q_search(
+        evaluator: &dyn Evaluator<Result = i16>,
+        board: &Board,
+        mut alpha: i16,
+        beta: i16,
+    ) -> i16 {
+        let evaluation = evaluator.evaluate(board);
         if evaluation >= beta {
             beta
         } else {
@@ -104,7 +109,7 @@ impl AlphaBetaChessAgent {
                 alpha = evaluation;
             }
             for m in MOVE_SORTER.sorted_captures(board).into_iter() {
-                let score = -self.q_search(&board.make_move_new(m), -beta, -alpha);
+                let score = -Self::q_search(evaluator, &board.make_move_new(m), -beta, -alpha);
                 if score >= beta {
                     alpha = beta;
                     break;
@@ -120,12 +125,19 @@ impl AlphaBetaChessAgent {
     // this is really just a pure alpha beta search
     // with no caching or storing evaluations in nodes
     // used for the null move heursitic
-    fn null_alpha_beta(&self, board: &Board, depth: u8, mut alpha: i16, beta: i16) -> i16 {
+    fn null_alpha_beta(
+        evaluator: &dyn Evaluator<Result = i16>,
+        board: &Board,
+        depth: u8,
+        mut alpha: i16,
+        beta: i16,
+    ) -> i16 {
         if depth == 0 {
-            self.evaluator.evaluate(board)
+            evaluator.evaluate(board)
         } else {
             for child_move in MOVE_SORTER.sorted_moves(board, None) {
-                let val = -self.null_alpha_beta(
+                let val = -Self::null_alpha_beta(
+                    evaluator,
                     &board.make_move_new(child_move),
                     depth - 1,
                     -beta,
@@ -143,7 +155,8 @@ impl AlphaBetaChessAgent {
     }
 
     fn null_window_search(
-        &self,
+        evaluator: &dyn Evaluator<Result = i16>,
+        tt: &TranspositionTable<i16>,
         board: &Board,
         depth: u8,
         alpha: i16,
@@ -151,7 +164,9 @@ impl AlphaBetaChessAgent {
         check_extension_enabled: bool,
     ) -> i16 {
         // Search with null window at first
-        let value = -self.alpha_beta(
+        let value = -Self::alpha_beta(
+            evaluator,
+            tt,
             board,
             depth - 1,
             -alpha - 1,
@@ -160,25 +175,36 @@ impl AlphaBetaChessAgent {
         );
         // Re-search the path with regular window if alpha < value < beta
         if alpha < value && value < beta {
-            -self.alpha_beta(board, depth - 1, -beta, -alpha, check_extension_enabled)
+            -Self::alpha_beta(
+                evaluator,
+                tt,
+                board,
+                depth - 1,
+                -beta,
+                -alpha,
+                check_extension_enabled,
+            )
         } else {
             value
         }
     }
 
     fn principal_variation_search(
-        &self,
+        evaluator: &dyn Evaluator<Result = i16>,
+        tt: &TranspositionTable<i16>,
         board: &Board,
         depth: u8,
         mut alpha: i16,
         beta: i16,
         check_extension_enabled: bool,
     ) -> (i16, ChessMove) {
-        let moves = self.expand(board);
+        let moves = Self::expand(tt, board);
         let mut best_move = moves[0];
 
         // Search down the principal variation path first with regular window
-        let value = -self.alpha_beta(
+        let value = -Self::alpha_beta(
+            evaluator,
+            tt,
             &board.make_move_new(moves[0]),
             depth - 1,
             -beta,
@@ -194,7 +220,9 @@ impl AlphaBetaChessAgent {
 
         // Search the rest of the paths with null windows
         for &child_move in moves.iter().skip(1) {
-            let value = self.null_window_search(
+            let value = Self::null_window_search(
+                evaluator,
+                tt,
                 &board.make_move_new(child_move),
                 depth,
                 alpha,
@@ -213,7 +241,8 @@ impl AlphaBetaChessAgent {
     }
 
     fn alpha_beta(
-        &self,
+        evaluator: &dyn Evaluator<Result = i16>,
+        tt: &TranspositionTable<i16>,
         board: &Board,
         mut depth: u8,
         mut alpha: i16,
@@ -225,34 +254,41 @@ impl AlphaBetaChessAgent {
         let alpha_orig = alpha;
         // Get cached evaluation if it exists and update alpha/beta accordingly
         // If an exact value is already cached, return that immediately
-        if let Some(value) = self.cached_evaluation(board, depth, &mut alpha, &mut beta) {
+        if let Some(value) = Self::cached_evaluation(tt, board, depth, &mut alpha, &mut beta) {
             return value;
         }
         // If game is over, return evaluation
         if status != BoardStatus::Ongoing {
-            return self.evaluator.evaluate(board);
+            return evaluator.evaluate(board);
         }
         // If depth is 0, evaluate after quiesence search, cache and return
         if depth == 0 {
-            let value = self.q_search(board, alpha, beta);
-            self.tt
-                .update_evaluation_and_best_move(board, depth, NodeValue::pv_node(value), None);
+            let value = Self::q_search(evaluator, board, alpha, beta);
+            tt.update_evaluation_and_best_move(board, depth, NodeValue::pv_node(value), None);
             return value;
         }
         // depth >= 3, try null-move pruning
         if depth >= 3 {
             if let Some(null_move_game) = board.null_move() {
-                let score = -self.null_alpha_beta(&null_move_game, depth - 3, -beta, -beta + 1);
+                let score =
+                    -Self::null_alpha_beta(evaluator, &null_move_game, depth - 3, -beta, -beta + 1);
                 if score >= beta {
                     return beta;
                 }
             }
         }
         // perform principal search
-        let (value, best_move) =
-            self.principal_variation_search(board, depth, alpha, beta, check_extension_enabled);
+        let (value, best_move) = Self::principal_variation_search(
+            evaluator,
+            tt,
+            board,
+            depth,
+            alpha,
+            beta,
+            check_extension_enabled,
+        );
         // update value/best_move in transpostion tables
-        self.update_cache(board, depth, alpha_orig, beta, value, best_move);
+        Self::update_cache(tt, board, depth, alpha_orig, beta, value, best_move);
         value
     }
 }
@@ -263,11 +299,19 @@ impl ChessAgent for AlphaBetaChessAgent {
         let beta = self.evaluator.max_value();
 
         for i in 1..=self.depth {
-            self.alpha_beta(&game.current_position(), i, alpha, beta, true);
+            Self::alpha_beta(
+                self.evaluator.as_ref(),
+                &self.tt,
+                &game.current_position(),
+                i,
+                alpha,
+                beta,
+                true,
+            );
         }
 
         // get best move
-        let best_move = self.expand(&game.current_position())[0];
+        let best_move = Self::expand(&self.tt, &game.current_position())[0];
 
         Action::MakeMove(best_move)
     }

@@ -7,29 +7,35 @@ use chess::{Board, ChessMove};
 
 const CACHE_SIZE: usize = 30000000;
 
-type ThreadCountHash = (u8, EvaluationHash);
+type ThreadCountHash<T> = (u8, EvaluationHash<T>);
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-struct EvaluationHash {
+struct EvaluationHash<T> {
     hash: u64,
     depth: u8,
-    value: NodeValue<i16>,
+    value: NodeValue<T>,
     best_move_hash: u16,
 }
 
-pub struct TranspositionTable {
+pub struct TranspositionTable<T> {
     cache_size: u64,
-    deep_cache: Vec<Mutex<RefCell<ThreadCountHash>>>,
-    shallow_cache: Vec<Mutex<RefCell<EvaluationHash>>>,
+    deep_cache: Vec<Mutex<RefCell<ThreadCountHash<T>>>>,
+    shallow_cache: Vec<Mutex<RefCell<EvaluationHash<T>>>>,
 }
 
-impl Default for TranspositionTable {
+impl<T> Default for TranspositionTable<T>
+where
+    T: Copy + Default,
+{
     fn default() -> Self {
         Self::new(CACHE_SIZE)
     }
 }
 
-impl TranspositionTable {
+impl<T> TranspositionTable<T>
+where
+    T: Copy + Default,
+{
     pub fn new(cache_size: usize) -> Self {
         let size = cache_size / 2;
         let mut deep_cache = Vec::with_capacity(size);
@@ -77,7 +83,7 @@ impl TranspositionTable {
         None
     }
 
-    pub fn get_evaluation_and_depth(&self, board: &Board) -> Option<(NodeValue<i16>, u8)> {
+    pub fn get_evaluation_and_depth(&self, board: &Board) -> Option<(NodeValue<T>, u8)> {
         let hash = board.get_hash();
         // try from deep cache first
         {
@@ -106,7 +112,7 @@ impl TranspositionTable {
         &self,
         board: &Board,
         depth: u8,
-        node: NodeValue<i16>,
+        node: NodeValue<T>,
         best_move: Option<ChessMove>,
     ) {
         let hash = board.get_hash();

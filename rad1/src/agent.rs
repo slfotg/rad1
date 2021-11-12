@@ -1,7 +1,7 @@
-use chess::{Action, Game};
-//use crate tt::TranspositionTable;
 use crate::eval::Evaluator;
 use crate::tt::TranspositionTable;
+use chess::{Action, Game};
+use std::sync::Arc;
 
 mod ab;
 mod cli;
@@ -21,8 +21,8 @@ pub fn command_line_agent() -> cli::CommandLineAgent {
 
 pub fn alpha_beta_agent(
     depth: u8,
-    tt: TranspositionTable,
-    evaluator: Box<dyn Evaluator<Result = i16>>,
+    tt: TranspositionTable<i16>,
+    evaluator: Arc<dyn Evaluator<Result = i16>>,
 ) -> ab::AlphaBetaChessAgent {
     ab::AlphaBetaChessAgent::new(depth, tt, evaluator)
 }

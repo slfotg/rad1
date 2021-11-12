@@ -7,6 +7,7 @@ use rad1::agent::ChessAgent;
 use rad1::eval;
 use rad1::tt::TranspositionTable;
 use std::str::FromStr;
+use std::sync::Arc;
 
 pub fn play_app(command_name: &str) -> App<'static, 'static> {
     App::new(command_name)
@@ -56,14 +57,14 @@ pub fn exec(matches: &ArgMatches) {
         let black_player = agent::alpha_beta_agent(
             depth,
             TranspositionTable::default(),
-            Box::new(eval::naive_evaluator()),
+            Arc::new(eval::naive_evaluator()),
         );
         play_game(&mut game, &white_player, &black_player, false);
     } else {
         let white_player = agent::alpha_beta_agent(
             depth,
             TranspositionTable::default(),
-            Box::new(eval::naive_evaluator()),
+            Arc::new(eval::naive_evaluator()),
         );
         let black_player = agent::command_line_agent();
         play_game(&mut game, &white_player, &black_player, true);

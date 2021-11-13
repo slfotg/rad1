@@ -7,7 +7,6 @@ use rad1::agent::ChessAgent;
 use rad1::eval;
 use rad1::tt::TranspositionTable;
 use std::str::FromStr;
-use std::sync::Arc;
 
 pub fn play_app(command_name: &str) -> App<'static, 'static> {
     App::new(command_name)
@@ -41,8 +40,8 @@ pub fn play_app(command_name: &str) -> App<'static, 'static> {
                 .short("c")
                 .required(false)
                 .default_value("White")
-                .possible_values(&["White", "Black"])
-                .help("The color you want to play as"),
+                .possible_values(&["White", "Black", "None"])
+                .help("The color you want to play as, or None to play computer vs computer"),
         )
 }
 
@@ -52,22 +51,38 @@ pub fn exec(matches: &ArgMatches) {
     let color = matches.value_of("color").unwrap();
     let depth: u8 = matches.value_of("depth").unwrap().parse().unwrap();
 
-    if color == "White" {
-        let white_player = agent::command_line_agent();
-        let black_player = agent::alpha_beta_agent(
-            depth,
-            TranspositionTable::default(),
-            Arc::new(eval::naive_evaluator()),
-        );
-        play_game(&mut game, &white_player, &black_player, false);
-    } else {
-        let white_player = agent::alpha_beta_agent(
-            depth,
-            TranspositionTable::default(),
-            Arc::new(eval::naive_evaluator()),
-        );
-        let black_player = agent::command_line_agent();
-        play_game(&mut game, &white_player, &black_player, true);
+    match color {
+        "White" => {
+            let white_player = agent::command_line_agent();
+            let black_player = agent::alpha_beta_agent(
+                depth,
+                TranspositionTable::default(),
+                eval::naive_evaluator(),
+            );
+            play_game(&mut game, &white_player, &black_player, false);
+        }
+        "Black" => {
+            let white_player = agent::alpha_beta_agent(
+                depth,
+                TranspositionTable::default(),
+                eval::naive_evaluator(),
+            );
+            let black_player = agent::command_line_agent();
+            play_game(&mut game, &white_player, &black_player, false);
+        }
+        _ => {
+            let white_player = agent::alpha_beta_agent(
+                depth,
+                TranspositionTable::default(),
+                eval::naive_evaluator(),
+            );
+            let black_player = agent::alpha_beta_agent(
+                depth,
+                TranspositionTable::default(),
+                eval::naive_evaluator(),
+            );
+            play_game(&mut game, &white_player, &black_player, false);
+        }
     }
 }
 
@@ -79,18 +94,22 @@ fn play_game(
 ) {
     print_board(&game.current_position(), reverse_board);
     while game.result() == None {
-        let action = match game.current_position().side_to_move() {
-            Color::White => white_player.get_action(game),
-            Color::Black => black_player.get_action(game),
-        };
-        match action {
-            Action::MakeMove(chess_move) => game.make_move(chess_move),
-            Action::OfferDraw(color) => game.offer_draw(color),
-            Action::AcceptDraw => game.accept_draw(),
-            Action::DeclareDraw => game.declare_draw(),
-            Action::Resign(color) => game.resign(color),
-        };
-        print_board(&game.current_position(), reverse_board);
+        if game.can_declare_draw() {
+            game.declare_draw();
+        } else {
+            let action = match game.current_position().side_to_move() {
+                Color::White => white_player.get_action(game),
+                Color::Black => black_player.get_action(game),
+            };
+            match action {
+                Action::MakeMove(chess_move) => game.make_move(chess_move),
+                Action::OfferDraw(color) => game.offer_draw(color),
+                Action::AcceptDraw => game.accept_draw(),
+                Action::DeclareDraw => game.declare_draw(),
+                Action::Resign(color) => game.resign(color),
+            };
+            print_board(&game.current_position(), reverse_board);
+        }
     }
     println!("{:?}", game.result().unwrap());
 }

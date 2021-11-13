@@ -1,4 +1,5 @@
 use super::ChessAgent;
+use crate::eval::naive::NaiveEvaluator;
 use crate::eval::Evaluator;
 use crate::move_sorter::MOVE_SORTER;
 use crate::node::NodeValue;
@@ -6,27 +7,26 @@ use crate::tt::*;
 use chess::{Action, Board, BoardStatus, ChessMove, Game};
 use std::cmp;
 use std::sync::Arc;
+use std::thread;
+
+type Eval = NaiveEvaluator;
 
 pub struct AlphaBetaChessAgent {
     depth: u8,
     tt: Arc<TranspositionTable<i16>>,
-    evaluator: Arc<dyn Evaluator<Result = i16>>,
+    evaluator: Arc<NaiveEvaluator>,
 }
 
 impl AlphaBetaChessAgent {
-    pub fn new(
-        depth: u8,
-        tt: TranspositionTable<i16>,
-        evaluator: Arc<dyn Evaluator<Result = i16>>,
-    ) -> Self {
+    pub fn new(depth: u8, tt: TranspositionTable<i16>, evaluator: Eval) -> Self {
         AlphaBetaChessAgent {
             depth,
             tt: Arc::new(tt),
-            evaluator,
+            evaluator: Arc::new(evaluator),
         }
     }
 
-    pub fn set_evaluator(&mut self, evaluator: Arc<dyn Evaluator<Result = i16>>) {
+    pub fn set_evaluator(&mut self, evaluator: Arc<Eval>) {
         self.evaluator = evaluator;
     }
 
@@ -95,12 +95,7 @@ impl AlphaBetaChessAgent {
     }
 
     // quiescence search
-    fn q_search(
-        evaluator: &dyn Evaluator<Result = i16>,
-        board: &Board,
-        mut alpha: i16,
-        beta: i16,
-    ) -> i16 {
+    fn q_search(evaluator: &NaiveEvaluator, board: &Board, mut alpha: i16, beta: i16) -> i16 {
         let evaluation = evaluator.evaluate(board);
         if evaluation >= beta {
             beta
@@ -126,7 +121,7 @@ impl AlphaBetaChessAgent {
     // with no caching or storing evaluations in nodes
     // used for the null move heursitic
     fn null_alpha_beta(
-        evaluator: &dyn Evaluator<Result = i16>,
+        evaluator: &Eval,
         board: &Board,
         depth: u8,
         mut alpha: i16,
@@ -155,7 +150,7 @@ impl AlphaBetaChessAgent {
     }
 
     fn null_window_search(
-        evaluator: &dyn Evaluator<Result = i16>,
+        evaluator: &Eval,
         tt: &TranspositionTable<i16>,
         board: &Board,
         depth: u8,
@@ -190,7 +185,7 @@ impl AlphaBetaChessAgent {
     }
 
     fn principal_variation_search(
-        evaluator: &dyn Evaluator<Result = i16>,
+        evaluator: &Eval,
         tt: &TranspositionTable<i16>,
         board: &Board,
         depth: u8,
@@ -241,7 +236,7 @@ impl AlphaBetaChessAgent {
     }
 
     fn alpha_beta(
-        evaluator: &dyn Evaluator<Result = i16>,
+        evaluator: &Eval,
         tt: &TranspositionTable<i16>,
         board: &Board,
         mut depth: u8,
@@ -299,15 +294,18 @@ impl ChessAgent for AlphaBetaChessAgent {
         let beta = self.evaluator.max_value();
 
         for i in 1..=self.depth {
-            Self::alpha_beta(
-                self.evaluator.as_ref(),
-                &self.tt,
-                &game.current_position(),
-                i,
-                alpha,
-                beta,
-                true,
-            );
+            let mut handles = vec![];
+            for _ in 0..2 {
+                let evaluator = Arc::clone(&self.evaluator);
+                let tt = Arc::clone(&self.tt);
+                let board = game.current_position().clone();
+                handles.push(thread::spawn(move || {
+                    AlphaBetaChessAgent::alpha_beta(&evaluator, &tt, &board, i, alpha, beta, true);
+                }));
+            }
+            for handle in handles {
+                handle.join().unwrap();
+            }
         }
 
         // get best move

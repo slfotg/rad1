@@ -5,7 +5,6 @@ use rad1::agent::ChessAgent;
 use rad1::eval;
 use rad1::tt::TranspositionTable;
 use std::str::FromStr;
-use std::sync::Arc;
 
 pub fn analyze_app(command_name: &str) -> App<'static, 'static> {
     App::new(command_name)
@@ -44,7 +43,7 @@ fn analyze_position(game: &Game, depth: u8) {
     let agent = agent::alpha_beta_agent(
         depth,
         TranspositionTable::default(),
-        Arc::new(eval::naive_evaluator()),
+        eval::naive_evaluator(),
     );
     agent.get_action(game);
 }

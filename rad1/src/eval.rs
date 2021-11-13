@@ -1,6 +1,6 @@
 use chess::Board;
 
-mod naive;
+pub mod naive;
 
 pub trait Evaluator {
     type Result;
@@ -9,6 +9,6 @@ pub trait Evaluator {
     fn evaluate(&self, board: &Board) -> Self::Result;
 }
 
-pub fn naive_evaluator() -> impl Evaluator<Result = i16> {
+pub fn naive_evaluator() -> naive::NaiveEvaluator {
     naive::NaiveEvaluator::default()
 }

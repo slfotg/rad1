@@ -1,5 +1,7 @@
 use super::ChessAgent;
-use chess::{Action, ChessMove, Game};
+use crate::Action;
+use crate::ChessGame;
+use crate::ChessMove;
 use core::str::FromStr;
 use std::io;
 
@@ -7,7 +9,7 @@ use std::io;
 pub struct CommandLineAgent;
 
 impl ChessAgent for CommandLineAgent {
-    fn get_action(&self, game: &Game) -> Action {
+    fn get_action(&self, game: &ChessGame) -> Action {
         let action: Action;
         let board = game.current_position();
         loop {

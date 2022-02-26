@@ -1,11 +1,9 @@
-use chess::Game;
 use clap::{App, Arg, ArgMatches};
 use rad1::agent;
 use rad1::agent::ChessAgent;
-use rad1::eval;
 use rad1::tt::TranspositionTable;
+use rad1::ChessGame;
 use std::str::FromStr;
-use std::sync::Arc;
 
 pub fn analyze_app(command_name: &str) -> App<'static, 'static> {
     App::new(command_name)
@@ -35,16 +33,12 @@ pub fn analyze_app(command_name: &str) -> App<'static, 'static> {
 
 pub fn exec(matches: &ArgMatches) {
     let fen = matches.value_of("fen").unwrap();
-    let game = Game::from_str(fen).expect("Failed to parse FEN");
+    let game = ChessGame::from_str(fen).expect("Failed to parse FEN");
     let depth: u8 = matches.value_of("depth").unwrap().parse().unwrap();
     analyze_position(&game, depth);
 }
 
-fn analyze_position(game: &Game, depth: u8) {
-    let agent = agent::alpha_beta_agent(
-        depth,
-        TranspositionTable::default(),
-        Arc::new(eval::naive_evaluator()),
-    );
+fn analyze_position(game: &ChessGame, depth: u8) {
+    let agent = agent::alpha_beta_agent(depth, TranspositionTable::default());
     agent.get_action(game);
 }

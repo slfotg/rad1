@@ -1,13 +1,16 @@
 use ansi_term::{Colour, Style};
-use chess::{Action, Board, Color, Game, Piece, Rank, Square};
 use clap::{App, Arg, ArgMatches};
 use itertools::Either;
 use rad1::agent;
 use rad1::agent::ChessAgent;
-use rad1::eval;
 use rad1::tt::TranspositionTable;
+use rad1::ChessGame;
+use rad1::Color;
+use rad1::Piece;
+use rad1::Position;
+use rad1::Rank;
+use rad1::Square;
 use std::str::FromStr;
-use std::sync::Arc;
 
 pub fn play_app(command_name: &str) -> App<'static, 'static> {
     App::new(command_name)
@@ -48,54 +51,40 @@ pub fn play_app(command_name: &str) -> App<'static, 'static> {
 
 pub fn exec(matches: &ArgMatches) {
     let start_position = matches.value_of("start-position").unwrap();
-    let mut game = Game::from_str(start_position).expect("Failed to parse FEN");
+    let mut game = ChessGame::from_str(start_position).expect("Failed to parse FEN");
     let color = matches.value_of("color").unwrap();
     let depth: u8 = matches.value_of("depth").unwrap().parse().unwrap();
 
     if color == "White" {
         let white_player = agent::command_line_agent();
-        let black_player = agent::alpha_beta_agent(
-            depth,
-            TranspositionTable::default(),
-            Arc::new(eval::naive_evaluator()),
-        );
+        let black_player = agent::alpha_beta_agent(depth, TranspositionTable::default());
         play_game(&mut game, &white_player, &black_player, false);
     } else {
-        let white_player = agent::alpha_beta_agent(
-            depth,
-            TranspositionTable::default(),
-            Arc::new(eval::naive_evaluator()),
-        );
+        let white_player = agent::alpha_beta_agent(depth, TranspositionTable::default());
         let black_player = agent::command_line_agent();
         play_game(&mut game, &white_player, &black_player, true);
     }
 }
 
 fn play_game(
-    game: &mut Game,
+    game: &mut ChessGame,
     white_player: &dyn ChessAgent,
     black_player: &dyn ChessAgent,
     reverse_board: bool,
 ) {
     print_board(&game.current_position(), reverse_board);
     while game.result() == None {
-        let action = match game.current_position().side_to_move() {
+        let action = match game.side_to_move() {
             Color::White => white_player.get_action(game),
             Color::Black => black_player.get_action(game),
         };
-        match action {
-            Action::MakeMove(chess_move) => game.make_move(chess_move),
-            Action::OfferDraw(color) => game.offer_draw(color),
-            Action::AcceptDraw => game.accept_draw(),
-            Action::DeclareDraw => game.declare_draw(),
-            Action::Resign(color) => game.resign(color),
-        };
+        game.take_action(action);
         print_board(&game.current_position(), reverse_board);
     }
     println!("{:?}", game.result().unwrap());
 }
 
-fn print_board(board: &Board, reverse_board: bool) {
+fn print_board(position: &Position, reverse_board: bool) {
     #[cfg(target_os = "windows")]
     ansi_term::enable_ansi_support().expect("ANSI colors not supported");
 
@@ -104,12 +93,12 @@ fn print_board(board: &Board, reverse_board: bool) {
     let bg_black: Style = fg_black.on(Colour::Fixed(34));
     let bg_white: Style = fg_black.on(Colour::Fixed(220));
     let ranks = if reverse_board {
-        Either::Left(chess::ALL_RANKS.iter())
+        Either::Left(rad1::ALL_RANKS.iter())
     } else {
-        Either::Right(chess::ALL_RANKS.iter().rev())
+        Either::Right(rad1::ALL_RANKS.iter().rev())
     };
     for rank in ranks {
-        print_rank(rank, italic, bg_black, bg_white, board, reverse_board);
+        print_rank(rank, italic, bg_black, bg_white, position, reverse_board);
     }
     if reverse_board {
         println!("{}", italic.paint("    H  G  F  E  D  C  B  A"));
@@ -123,7 +112,7 @@ fn print_rank(
     italic: Style,
     bg_black: Style,
     bg_white: Style,
-    board: &Board,
+    position: &Position,
     reverse_board: bool,
 ) {
     let mut line: String = String::new();
@@ -138,13 +127,13 @@ fn print_rank(
             .to_string(),
     );
     let files = if reverse_board {
-        Either::Left(chess::ALL_FILES.iter().rev())
+        Either::Left(rad1::ALL_FILES.iter().rev())
     } else {
-        Either::Right(chess::ALL_FILES.iter())
+        Either::Right(rad1::ALL_FILES.iter())
     };
     for file in files {
         let square = Square::make_square(*rank, *file);
-        let piece_char = get_piece_char(board.color_on(square), board.piece_on(square));
+        let piece_char = get_piece_char(position.color_on(square), position.piece_on(square));
         line.push_str(&background.paint(format!(" {} ", piece_char)).to_string());
         background = if background == bg_white {
             bg_black

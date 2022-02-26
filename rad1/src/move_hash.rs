@@ -1,4 +1,7 @@
-use chess::{ChessMove, Square, ALL_SQUARES, PROMOTION_PIECES};
+use crate::ChessMove;
+use crate::Square;
+use crate::ALL_SQUARES;
+use crate::PROMOTION_PIECES;
 use lazy_static::lazy_static;
 
 lazy_static! {

@@ -2,13 +2,7 @@ use super::Evaluator;
 use chess::{Board, BoardStatus, Color, Piece, Square};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct NaiveEvaluator {}
-
-impl Default for NaiveEvaluator {
-    fn default() -> Self {
-        Self {}
-    }
-}
+pub struct NaiveEvaluator;
 
 impl NaiveEvaluator {
     const MIN: i16 = -30000;
@@ -175,7 +169,7 @@ mod tests {
     #[test]
     fn initial_board_eval() {
         let board = Board::default();
-        let evaluator = NaiveEvaluator::default();
+        let evaluator = NaiveEvaluator;
         let evaluation = evaluator.evaluate(&board);
         assert_eq!(evaluation, 0);
     }
@@ -185,7 +179,7 @@ mod tests {
         let board = Board::default();
         let chess_move = ChessMove::new(Square::E2, Square::E4, None);
         let board = board.make_move_new(chess_move);
-        let evaluator = NaiveEvaluator::default();
+        let evaluator = NaiveEvaluator;
         let evaluation = evaluator.evaluate(&board);
         assert_eq!(evaluation, -3);
     }

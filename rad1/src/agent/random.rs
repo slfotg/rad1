@@ -1,5 +1,6 @@
 use super::ChessAgent;
-use chess::{Action, ChessMove, Game, MoveGen};
+use crate::Action;
+use crate::ChessGame;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use std::cell::RefCell;
@@ -17,8 +18,8 @@ impl Default for RandomChessAgent {
 }
 
 impl ChessAgent for RandomChessAgent {
-    fn get_action(&self, game: &Game) -> Action {
-        let moves = MoveGen::new_legal(&game.current_position()).collect::<Vec<ChessMove>>();
+    fn get_action(&self, game: &ChessGame) -> Action {
+        let moves = game.current_position().legal_moves();
         Action::MakeMove(moves[self.rng.borrow_mut().gen_range(0..moves.len())])
     }
 }

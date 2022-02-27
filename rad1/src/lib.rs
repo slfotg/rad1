@@ -1,5 +1,4 @@
 use crate::eval::Evaluator;
-use chess::BitBoard;
 use chess::Board;
 use chess::Game;
 use chess::MoveGen;
@@ -27,10 +26,12 @@ pub type Rank = chess::Rank;
 pub type File = chess::File;
 pub type ParseError = chess::Error;
 pub type GameResult = chess::GameResult;
+pub type BitBoard = chess::BitBoard;
 
 pub const ALL_SQUARES: [Square; 64] = chess::ALL_SQUARES;
 pub const ALL_RANKS: [Rank; 8] = chess::ALL_RANKS;
 pub const ALL_FILES: [File; 8] = chess::ALL_FILES;
+pub const ALL_PIECES: [Piece; 6] = chess::ALL_PIECES;
 pub const PROMOTION_PIECES: [Piece; 4] = chess::PROMOTION_PIECES;
 
 pub struct ChessGame {
@@ -94,7 +95,7 @@ impl ChessGame {
 
 impl Position {
     pub fn evaluate(&self) -> i16 {
-        EVALUATOR.evaluate(&self.board)
+        EVALUATOR.evaluate(self)
     }
 
     pub fn get_hash(&self) -> u64 {
@@ -129,6 +130,18 @@ impl Position {
 
     pub fn status(&self) -> PositionStatus {
         self.board.status()
+    }
+
+    pub fn side_to_move(&self) -> Color {
+        self.board.side_to_move()
+    }
+
+    pub fn color_combined(&self, color: Color) -> &BitBoard {
+        self.board.color_combined(color)
+    }
+
+    pub fn pieces(&self, piece: Piece) -> &BitBoard {
+        self.board.pieces(piece)
     }
 
     #[inline]

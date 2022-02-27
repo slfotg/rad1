@@ -2,6 +2,7 @@ use clap::{App, Arg, ArgMatches};
 use rad1::agent;
 use rad1::agent::ChessAgent;
 use rad1::tt::TranspositionTable;
+use rad1::Action;
 use rad1::ChessGame;
 use std::str::FromStr;
 
@@ -40,5 +41,14 @@ pub fn exec(matches: &ArgMatches) {
 
 fn analyze_position(game: &ChessGame, depth: u8) {
     let agent = agent::alpha_beta_agent(depth, TranspositionTable::default());
-    agent.get_action(game);
+    println!(
+        "{}",
+        match agent.get_action(game) {
+            Action::MakeMove(chess_move) => chess_move.to_string(),
+            Action::OfferDraw(_) => String::from("Offer Draw"),
+            Action::AcceptDraw => String::from("Accept Draw"),
+            Action::DeclareDraw => String::from("Declare Draw"),
+            Action::Resign(_) => String::from("Resign"),
+        }
+    );
 }

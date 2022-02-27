@@ -1,5 +1,5 @@
 use super::Evaluator;
-use chess::{Board, BoardStatus, Color, Piece, Square};
+use crate::{Color, Piece, Position, PositionStatus, Square};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct NaiveEvaluator;
@@ -102,23 +102,23 @@ impl Evaluator for NaiveEvaluator {
     }
 
     #[inline]
-    fn evaluate(&self, board: &Board) -> Self::Result {
-        match board.status() {
-            BoardStatus::Stalemate => Self::ZERO,
-            BoardStatus::Checkmate => Self::MIN,
-            BoardStatus::Ongoing => {
+    fn evaluate(&self, position: &Position) -> Self::Result {
+        match position.status() {
+            PositionStatus::Stalemate => Self::ZERO,
+            PositionStatus::Checkmate => Self::MIN,
+            PositionStatus::Ongoing => {
                 let mut evaluation = 0;
-                let my_color = board.side_to_move();
-                let my_pieces = board.color_combined(my_color);
-                let their_pieces = board.color_combined(!my_color);
-                let pawns = board.pieces(Piece::Pawn);
-                let knights = board.pieces(Piece::Knight);
-                let bishops = board.pieces(Piece::Bishop);
-                let queens = board.pieces(Piece::Queen);
+                let my_color = position.side_to_move();
+                let my_pieces = position.color_combined(my_color);
+                let their_pieces = position.color_combined(!my_color);
+                let pawns = position.pieces(Piece::Pawn);
+                let knights = position.pieces(Piece::Knight);
+                let bishops = position.pieces(Piece::Bishop);
+                let queens = position.pieces(Piece::Queen);
 
                 // Piece Values
-                for &piece in chess::ALL_PIECES.iter() {
-                    let pieces = board.pieces(piece);
+                for &piece in crate::ALL_PIECES.iter() {
+                    let pieces = position.pieces(piece);
                     let value = Self::piece_value(piece);
                     evaluation += value
                         * ((my_pieces & pieces).popcnt() as i16
@@ -164,23 +164,23 @@ impl Evaluator for NaiveEvaluator {
 mod tests {
     use super::NaiveEvaluator;
     use crate::eval::Evaluator;
-    use chess::{Board, ChessMove, Square};
+    use crate::{ChessMove, Position, Square};
 
     #[test]
     fn initial_board_eval() {
-        let board = Board::default();
+        let position = Position::default();
         let evaluator = NaiveEvaluator;
-        let evaluation = evaluator.evaluate(&board);
+        let evaluation = evaluator.evaluate(&position);
         assert_eq!(evaluation, 0);
     }
 
     #[test]
     fn e4_black_turn_eval() {
-        let board = Board::default();
+        let position = Position::default();
         let chess_move = ChessMove::new(Square::E2, Square::E4, None);
-        let board = board.make_move_new(chess_move);
+        let position = position.make_move_new(chess_move);
         let evaluator = NaiveEvaluator;
-        let evaluation = evaluator.evaluate(&board);
+        let evaluation = evaluator.evaluate(&position);
         assert_eq!(evaluation, -3);
     }
 }
